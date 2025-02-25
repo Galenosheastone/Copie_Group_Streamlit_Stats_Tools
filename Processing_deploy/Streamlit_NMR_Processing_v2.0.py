@@ -54,23 +54,7 @@ if uploaded_file:
     # Read the file
     data = pd.read_csv(uploaded_file)
    
-    # Check allowed characters in column names:
-    # Allowed: English letters, numbers, underscore (_), hyphen (-) and forward slash (/)
-    allowed_pattern = re.compile(r'^[A-Za-z0-9_/-]+$')
-    invalid_cols = [col for col in data.columns if not allowed_pattern.match(str(col))]
-    if invalid_cols:
-        st.warning("The following column names contain disallowed characters and will be sanitized: " + ", ".join(invalid_cols))
-        # Sanitize: remove any characters not in the allowed set.
-        data.columns = [re.sub(r'[^A-Za-z0-9_/-]', '', str(col)) for col in data.columns]
-        st.write("Sanitized column names:", list(data.columns))
-    
-    # Check that data values are numeric.
-    # (Note: If you expect some non-numeric columns to be metadata, they will be flagged here.)
-    non_numeric = [col for col in data.columns if not pd.to_numeric(data[col], errors='coerce').notna().all()]
-    if non_numeric:
-        st.warning("The following columns contain non-numeric values. If these are metadata columns, please designate them accordingly: " + ", ".join(non_numeric))
-    else:
-        st.write("All data values are numeric.")
+   
 
     # Check for missing values.
     total_count = data.size
