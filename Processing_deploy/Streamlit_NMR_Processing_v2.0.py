@@ -53,13 +53,7 @@ if uploaded_file:
 
     # Read the file
     data = pd.read_csv(uploaded_file)
-    
-    # Check that samples are in rows and features in columns
-    # (Heuristic: number of rows should be greater than or equal to the number of columns)
-    if data.shape[0] < data.shape[1]:
-        st.error("It appears that samples might be in columns and features in rows. Please ensure that samples are in rows and features in columns.")
-        st.stop()
-    
+   
     # Check allowed characters in column names:
     # Allowed: English letters, numbers, underscore (_), hyphen (-) and forward slash (/)
     allowed_pattern = re.compile(r'^[A-Za-z0-9_/-]+$')
