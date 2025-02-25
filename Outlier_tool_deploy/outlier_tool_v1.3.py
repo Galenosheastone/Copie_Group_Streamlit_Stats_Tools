@@ -38,79 +38,78 @@ if uploaded_file is not None:
         id_cols = st.session_state["id_cols"]
         data_cols = st.session_state["data_cols"]
 
-        # Sidebar options for preprocessing
+        # --- New Multi-Method Preprocessing Options ---
         st.sidebar.header("Data Preprocessing Options")
         st.sidebar.markdown(
             """
-            Select a preprocessing method for the feature data before running PCA:
+            Select any preprocessing methods to apply to the feature data.
             
-            - **None (raw data):** Use the data as is.
-            - **StandardScaler (Autoscaling):** Subtract the mean and scale to unit variance.
-            - **MinMaxScaler (Normalization):** Scale features to the range [0, 1].
-            - **Log Transformation:** Apply a logarithmic transformation (requires all values > 0).
-            - **Box-Cox Transformation:** Transform data to approximate normality (requires all values > 0).
+            **Order of application:**  
+            1. Log Transformation  
+            2. Box‑Cox Transformation  
+            3. StandardScaler (Autoscaling)  
+            4. MinMaxScaler (Normalization)
+            
+            **Note:** For Log and Box‑Cox transformations, all feature values must be > 0.
             """
         )
-
-        preprocessing_method = st.sidebar.selectbox(
-            "Select Preprocessing Method", 
-            options=[
-                "None (raw data)",
-                "StandardScaler (Autoscaling)",
-                "MinMaxScaler (Normalization)",
-                "Log Transformation",
-                "Box-Cox Transformation"
-            ],
-            index=0
-        )
-
-        st.sidebar.markdown("**Note:** For Log and Box‑Cox transformations, all feature values must be positive.")
+        apply_log = st.sidebar.checkbox("Log Transformation")
+        apply_boxcox = st.sidebar.checkbox("Box‑Cox Transformation")
+        apply_standard = st.sidebar.checkbox("StandardScaler (Autoscaling)")
+        apply_minmax = st.sidebar.checkbox("MinMaxScaler (Normalization)")
 
         st.subheader("Data Preprocessing and PCA")
-        # Preprocess the feature data based on the selected method
-        if preprocessing_method == "None (raw data)":
-            data_scaled = df[data_cols].values
+        # Start with the original feature data
+        data_processed = df[data_cols].values
+
+        # If no preprocessing method is selected, use raw data.
+        if not any([apply_log, apply_boxcox, apply_standard, apply_minmax]):
             st.write("**Using raw feature data (no preprocessing).**")
             st.dataframe(df[data_cols].head())
-        elif preprocessing_method == "StandardScaler (Autoscaling)":
-            scaler = StandardScaler()
-            data_scaled = scaler.fit_transform(df[data_cols])
-            st.write("**Data after StandardScaler (Autoscaling):**")
-            st.dataframe(pd.DataFrame(data_scaled, columns=data_cols).head())
-        elif preprocessing_method == "MinMaxScaler (Normalization)":
-            scaler = MinMaxScaler()
-            data_scaled = scaler.fit_transform(df[data_cols])
-            st.write("**Data after MinMaxScaler (Normalization):**")
-            st.dataframe(pd.DataFrame(data_scaled, columns=data_cols).head())
-        elif preprocessing_method == "Log Transformation":
-            if (df[data_cols] <= 0).any().any():
-                st.error("Log Transformation requires all feature values to be > 0. Using raw data instead.")
-                data_scaled = df[data_cols].values
-            else:
-                data_scaled = np.log(df[data_cols].values)
-                st.write("**Data after Log Transformation:**")
-                st.dataframe(pd.DataFrame(data_scaled, columns=data_cols).head())
-        elif preprocessing_method == "Box-Cox Transformation":
-            if (df[data_cols] <= 0).any().any():
-                st.error("Box-Cox Transformation requires all feature values to be > 0. Using raw data instead.")
-                data_scaled = df[data_cols].values
-            else:
-                try:
-                    transformer = PowerTransformer(method='box-cox')
-                    data_scaled = transformer.fit_transform(df[data_cols])
-                    st.write("**Data after Box-Cox Transformation:**")
-                    st.dataframe(pd.DataFrame(data_scaled, columns=data_cols).head())
-                except Exception as e:
-                    st.error(f"Box-Cox transformation failed: {e}. Using raw data instead.")
-                    data_scaled = df[data_cols].values
+        else:
+            # Apply Log Transformation if selected
+            if apply_log:
+                if (data_processed <= 0).any():
+                    st.error("Log Transformation requires all feature values to be > 0. Skipping Log Transformation.")
+                else:
+                    data_processed = np.log(data_processed)
+                    st.write("**Data after Log Transformation:**")
+                    st.dataframe(pd.DataFrame(data_processed, columns=data_cols).head())
+            
+            # Apply Box‑Cox Transformation if selected
+            if apply_boxcox:
+                if (data_processed <= 0).any():
+                    st.error("Box‑Cox Transformation requires all feature values to be > 0. Skipping Box‑Cox Transformation.")
+                else:
+                    try:
+                        transformer = PowerTransformer(method='box-cox')
+                        data_processed = transformer.fit_transform(data_processed)
+                        st.write("**Data after Box‑Cox Transformation:**")
+                        st.dataframe(pd.DataFrame(data_processed, columns=data_cols).head())
+                    except Exception as e:
+                        st.error(f"Box‑Cox transformation failed: {e}. Skipping Box‑Cox Transformation.")
+            
+            # Apply StandardScaler (Autoscaling) if selected
+            if apply_standard:
+                scaler = StandardScaler()
+                data_processed = scaler.fit_transform(data_processed)
+                st.write("**Data after StandardScaler (Autoscaling):**")
+                st.dataframe(pd.DataFrame(data_processed, columns=data_cols).head())
+            
+            # Apply MinMaxScaler (Normalization) if selected
+            if apply_minmax:
+                scaler = MinMaxScaler()
+                data_processed = scaler.fit_transform(data_processed)
+                st.write("**Data after MinMaxScaler (Normalization):**")
+                st.dataframe(pd.DataFrame(data_processed, columns=data_cols).head())
 
         # Save preprocessed data along with identifier columns for download
-        df_preprocessed = pd.DataFrame(data_scaled, columns=data_cols)
+        df_preprocessed = pd.DataFrame(data_processed, columns=data_cols)
         df_preprocessed[id_cols] = df[id_cols]
 
         # Perform PCA using 2 components
         pca = PCA(n_components=2)
-        pca_scores = pca.fit_transform(data_scaled)
+        pca_scores = pca.fit_transform(data_processed)
         df_pca = pd.DataFrame(pca_scores, columns=["PC1", "PC2"])
         df_pca[id_cols] = df[id_cols].values
 
@@ -218,7 +217,7 @@ if uploaded_file is not None:
         st.download_button(
             label="Download Preprocessed Feature Data (CSV)",
             data=csv_preprocessed,
-            file_name=("data.csv" if preprocessing_method == "None (raw data)" 
+            file_name=("data.csv" if not any([apply_log, apply_boxcox, apply_standard, apply_minmax])
                        else "preprocessed_data.csv"),
             mime="text/csv"
         )
