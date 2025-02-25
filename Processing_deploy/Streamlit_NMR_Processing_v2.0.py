@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -559,10 +559,29 @@ if uploaded_file:
 
         st.pyplot(fig)
 
-        # Save processed data with the original file name appended with "_processed"
+        # Save processed data with a filename that includes the processing details
         processed_csv = processed_data.to_csv(index=False)
         original_filename = uploaded_file.name  # e.g., "data.csv"
-        processed_filename = original_filename.rsplit(".", 1)[0] + "_processed.csv"
+        processing_details = []
+        if normalization_method != "None":
+            processing_details.append(normalization_method)
+        if do_log_transform:
+            processing_details.append("log")
+        if scaling_method != "None":
+            # Map longer scaling method names to a shorter version
+            scaling_map = {
+                "Mean-center": "meancenter",
+                "Autoscale (mean-center + unit variance)": "autoscale",
+                "Pareto": "pareto",
+                "Range": "range"
+            }
+            processing_details.append(scaling_map.get(scaling_method, scaling_method.replace(" ", "").lower()))
+        details_str = "_".join(processing_details)
+        if details_str:
+            processed_filename = original_filename.rsplit(".", 1)[0] + f"_processed_{details_str}.csv"
+        else:
+            processed_filename = original_filename.rsplit(".", 1)[0] + "_processed.csv"
+
         st.download_button(
             label="Download Processed CSV",
             data=processed_csv,
