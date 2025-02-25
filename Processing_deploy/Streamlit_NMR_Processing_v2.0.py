@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import random
 import scipy.stats as stats
+import re
 
 st.title("Copié Lab NMR Metabolomics Data Processing Streamlit App")
 """
@@ -15,7 +16,6 @@ This app helps you:
 4. Optionally apply row-based normalization, log transformation, and scaling.
 5. Visualize the data before and after processing. 
 6. Save the processed data
-
 """
 
 st.write("""
@@ -33,7 +33,6 @@ Welcome to this Streamlit application for preprocessing and exploring NMR metabo
 - **Visualize** data before and after transformations
 - **Save Processed Data** for use in downstream analysis
 
-
 Please contact galenoshea@gmail.com for any questions or suggestions
 """)
 
@@ -43,138 +42,177 @@ Please contact galenoshea@gmail.com for any questions or suggestions
 
 uploaded_file = st.file_uploader("Choose a CSV file", type=["csv"])
 
-############################
-# Data Transformation Logic#
-############################
-
-def apply_transformations(data, numeric_columns, normalization_method, do_log_transform, scaling_method):
-    """
-    Applies row-based normalization, log transformation, and scaling to the data.
-    """
-    def min_pos(series):
-        # Returns 1/5 of the minimum positive value in a series.
-        valid_vals = series[series > 0]
-        if len(valid_vals) > 0:
-            return valid_vals.min() / 5.0
-        return np.nan
-
-    processed_data = data.copy()
-    min_positive_vals = processed_data[numeric_columns].apply(min_pos)
-
-    # Replace 0 or NaN with 1/5 of the min positive value in each column
-    for col in numeric_columns:
-        rp = min_positive_vals[col]
-        if pd.notna(rp):
-            processed_data[col] = processed_data[col].replace(0, np.nan).fillna(rp)
-
-    # Row-based normalization
-    if normalization_method == "Sum":
-        row_sums = processed_data[numeric_columns].sum(axis=1)
-        row_sums.replace(0, np.nan, inplace=True)
-        processed_data[numeric_columns] = processed_data[numeric_columns].div(row_sums, axis=0)
-    elif normalization_method == "Median":
-        row_medians = processed_data[numeric_columns].median(axis=1)
-        row_medians.replace(0, np.nan, inplace=True)
-        processed_data[numeric_columns] = processed_data[numeric_columns].div(row_medians, axis=0)
-
-    # Log transform
-    if do_log_transform:
-        processed_data[numeric_columns] = np.log(processed_data[numeric_columns])
-
-    # Scaling
-    if scaling_method == "Mean-center":
-        for col in numeric_columns:
-            col_mean = processed_data[col].mean()
-            processed_data[col] = processed_data[col] - col_mean
-
-    elif scaling_method == "Autoscale (mean-center + unit variance)":
-        for col in numeric_columns:
-            col_mean = processed_data[col].mean()
-            col_std = processed_data[col].std()
-            if col_std == 0:
-                processed_data[col] = processed_data[col] - col_mean
-            else:
-                processed_data[col] = (processed_data[col] - col_mean) / col_std
-
-    elif scaling_method == "Pareto":
-        for col in numeric_columns:
-            col_mean = processed_data[col].mean()
-            col_std = processed_data[col].std()
-            if col_std == 0:
-                processed_data[col] = processed_data[col] - col_mean
-            else:
-                processed_data[col] = (processed_data[col] - col_mean) / np.sqrt(col_std)
-
-    elif scaling_method == "Range":
-        for col in numeric_columns:
-            col_min = processed_data[col].min()
-            col_max = processed_data[col].max()
-            denominator = col_max - col_min
-            if denominator == 0:
-                processed_data[col] = 0
-            else:
-                processed_data[col] = (processed_data[col] - col_min) / denominator
-
-    return processed_data
-
-
-def compute_normality_metrics(processed_data, numeric_columns, do_mardia=False):
-    """
-    Returns a dict with summary statistics:
-      - avg_abs_skew: average absolute skewness across features
-      - avg_excess_kurtosis: average excess kurtosis across features
-      - proportion_shapiro: proportion of features with Shapiro–Wilk p > 0.05
-      - mardia_stat (optional): approximate Mardia's statistic for multivariate normality
-    """
-    skew_list = []
-    shapiro_pvals = []
-    kurtosis_list = []
-
-    for col in numeric_columns:
-        col_data = processed_data[col].dropna()
-        if len(col_data) > 3:  # Shapiro requires at least 3 data points
-            skew_list.append(abs(stats.skew(col_data)))
-            kurtosis_list.append(stats.kurtosis(col_data))
-            _, pval = stats.shapiro(col_data)
-            shapiro_pvals.append(pval)
-        else:
-            skew_list.append(np.nan)
-            kurtosis_list.append(np.nan)
-            shapiro_pvals.append(np.nan)
-
-    avg_abs_skew = np.nanmean(skew_list)
-    avg_excess_kurtosis = np.nanmean(kurtosis_list)
-
-    valid_shapiro = ~np.isnan(shapiro_pvals)
-    if np.sum(valid_shapiro) > 0:
-        proportion_shapiro = (
-            np.sum(np.array(shapiro_pvals)[valid_shapiro] > 0.05) / np.sum(valid_shapiro)
-        )
-    else:
-        proportion_shapiro = np.nan
-
-    mardia_stat = np.nan
-    if do_mardia:
-        X = processed_data[numeric_columns].dropna()
-        if len(X) > 3:
-            # Placeholder: use absolute skewness of flattened data as a stand-in for Mardia's test.
-            # In practice, you'd calculate the actual Mardia's skewness and kurtosis.
-            mardia_stat = abs(stats.skew(X.values.flatten()))
-        else:
-            mardia_stat = np.nan
-
-    return {
-        'avg_abs_skew': avg_abs_skew,
-        'avg_excess_kurtosis': avg_excess_kurtosis,
-        'proportion_shapiro': proportion_shapiro,
-        'mardia_stat': mardia_stat
-    }
-
-# Check if user has uploaded a file
 if uploaded_file:
+    # -------------------------------
+    # Sanity Check Section
+    # -------------------------------
+    # Check file extension (CSV)
+    if not uploaded_file.name.lower().endswith('.csv'):
+        st.error("Uploaded file must be in CSV format.")
+        st.stop()
+
+    # Read the file
     data = pd.read_csv(uploaded_file)
+    
+    # Check that samples are in rows and features in columns
+    # (Heuristic: number of rows should be greater than or equal to the number of columns)
+    if data.shape[0] < data.shape[1]:
+        st.error("It appears that samples might be in columns and features in rows. Please ensure that samples are in rows and features in columns.")
+        st.stop()
+    
+    # Check allowed characters in column names:
+    # Allowed: English letters, numbers, underscore (_), hyphen (-) and forward slash (/)
+    allowed_pattern = re.compile(r'^[A-Za-z0-9_/-]+$')
+    invalid_cols = [col for col in data.columns if not allowed_pattern.match(str(col))]
+    if invalid_cols:
+        st.warning("The following column names contain disallowed characters and will be sanitized: " + ", ".join(invalid_cols))
+        # Sanitize: remove any characters not in the allowed set.
+        data.columns = [re.sub(r'[^A-Za-z0-9_/-]', '', str(col)) for col in data.columns]
+        st.write("Sanitized column names:", list(data.columns))
+    
+    # Check that data values are numeric.
+    # (Note: If you expect some non-numeric columns to be metadata, they will be flagged here.)
+    non_numeric = [col for col in data.columns if not pd.to_numeric(data[col], errors='coerce').notna().all()]
+    if non_numeric:
+        st.warning("The following columns contain non-numeric values. If these are metadata columns, please designate them accordingly: " + ", ".join(non_numeric))
+    else:
+        st.write("All data values are numeric.")
+
+    # Check for missing values.
+    total_count = data.size
+    missing_count = data.isna().sum().sum()
+    missing_percent = (missing_count / total_count) * 100
+    st.write(f"A total of {missing_count} ({missing_percent:.1f}%) missing values were detected.")
+    st.write("By default, missing values will be replaced by 1/5 of the minimum positive value of their corresponding variables.")
+    
     st.write("### Uploaded Data")
     st.write(data.head())
+
+    ############################
+    # Data Transformation Logic#
+    ############################
+    
+    def apply_transformations(data, numeric_columns, normalization_method, do_log_transform, scaling_method):
+        """
+        Applies row-based normalization, log transformation, and scaling to the data.
+        """
+        def min_pos(series):
+            # Returns 1/5 of the minimum positive value in a series.
+            valid_vals = series[series > 0]
+            if len(valid_vals) > 0:
+                return valid_vals.min() / 5.0
+            return np.nan
+
+        processed_data = data.copy()
+        min_positive_vals = processed_data[numeric_columns].apply(min_pos)
+
+        # Replace 0 or NaN with 1/5 of the min positive value in each column
+        for col in numeric_columns:
+            rp = min_positive_vals[col]
+            if pd.notna(rp):
+                processed_data[col] = processed_data[col].replace(0, np.nan).fillna(rp)
+
+        # Row-based normalization
+        if normalization_method == "Sum":
+            row_sums = processed_data[numeric_columns].sum(axis=1)
+            row_sums.replace(0, np.nan, inplace=True)
+            processed_data[numeric_columns] = processed_data[numeric_columns].div(row_sums, axis=0)
+        elif normalization_method == "Median":
+            row_medians = processed_data[numeric_columns].median(axis=1)
+            row_medians.replace(0, np.nan, inplace=True)
+            processed_data[numeric_columns] = processed_data[numeric_columns].div(row_medians, axis=0)
+
+        # Log transform
+        if do_log_transform:
+            processed_data[numeric_columns] = np.log(processed_data[numeric_columns])
+
+        # Scaling
+        if scaling_method == "Mean-center":
+            for col in numeric_columns:
+                col_mean = processed_data[col].mean()
+                processed_data[col] = processed_data[col] - col_mean
+
+        elif scaling_method == "Autoscale (mean-center + unit variance)":
+            for col in numeric_columns:
+                col_mean = processed_data[col].mean()
+                col_std = processed_data[col].std()
+                if col_std == 0:
+                    processed_data[col] = processed_data[col] - col_mean
+                else:
+                    processed_data[col] = (processed_data[col] - col_mean) / col_std
+
+        elif scaling_method == "Pareto":
+            for col in numeric_columns:
+                col_mean = processed_data[col].mean()
+                col_std = processed_data[col].std()
+                if col_std == 0:
+                    processed_data[col] = processed_data[col] - col_mean
+                else:
+                    processed_data[col] = (processed_data[col] - col_mean) / np.sqrt(col_std)
+
+        elif scaling_method == "Range":
+            for col in numeric_columns:
+                col_min = processed_data[col].min()
+                col_max = processed_data[col].max()
+                denominator = col_max - col_min
+                if denominator == 0:
+                    processed_data[col] = 0
+                else:
+                    processed_data[col] = (processed_data[col] - col_min) / denominator
+
+        return processed_data
+
+
+    def compute_normality_metrics(processed_data, numeric_columns, do_mardia=False):
+        """
+        Returns a dict with summary statistics:
+          - avg_abs_skew: average absolute skewness across features
+          - avg_excess_kurtosis: average excess kurtosis across features
+          - proportion_shapiro: proportion of features with Shapiro–Wilk p > 0.05
+          - mardia_stat (optional): approximate Mardia's statistic for multivariate normality
+        """
+        skew_list = []
+        shapiro_pvals = []
+        kurtosis_list = []
+
+        for col in numeric_columns:
+            col_data = processed_data[col].dropna()
+            if len(col_data) > 3:  # Shapiro requires at least 3 data points
+                skew_list.append(abs(stats.skew(col_data)))
+                kurtosis_list.append(stats.kurtosis(col_data))
+                _, pval = stats.shapiro(col_data)
+                shapiro_pvals.append(pval)
+            else:
+                skew_list.append(np.nan)
+                kurtosis_list.append(np.nan)
+                shapiro_pvals.append(np.nan)
+
+        avg_abs_skew = np.nanmean(skew_list)
+        avg_excess_kurtosis = np.nanmean(kurtosis_list)
+
+        valid_shapiro = ~np.isnan(shapiro_pvals)
+        if np.sum(valid_shapiro) > 0:
+            proportion_shapiro = (
+                np.sum(np.array(shapiro_pvals)[valid_shapiro] > 0.05) / np.sum(valid_shapiro)
+            )
+        else:
+            proportion_shapiro = np.nan
+
+        mardia_stat = np.nan
+        if do_mardia:
+            X = processed_data[numeric_columns].dropna()
+            if len(X) > 3:
+                # Placeholder: use absolute skewness of flattened data as a stand-in for Mardia's test.
+                mardia_stat = abs(stats.skew(X.values.flatten()))
+            else:
+                mardia_stat = np.nan
+
+        return {
+            'avg_abs_skew': avg_abs_skew,
+            'avg_excess_kurtosis': avg_excess_kurtosis,
+            'proportion_shapiro': proportion_shapiro,
+            'mardia_stat': mardia_stat
+        }
 
     # Replace 'ND' with NaN
     data.replace('ND', np.nan, inplace=True)
