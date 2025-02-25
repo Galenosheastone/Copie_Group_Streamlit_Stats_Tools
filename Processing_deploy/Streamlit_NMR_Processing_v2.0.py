@@ -24,7 +24,7 @@ st.write("""
 Welcome to this Streamlit application for preprocessing and exploring NMR metabolomics data. Here’s what you can do:
 
 - **Upload a CSV file** with metabolomics data
-- **Impute missing** 'ND' and zero values with 1/5th of the minimum positive value
+- **Impute missing** 'ND' and zero values with 1/5 of the minimum positive value
 - **Compare** multiple transformations with univariate and optional **Mardia’s** multivariate normality tests
 - **Determine** the best fit using a simple ranking method
 - **Normalize** per-row via sum or median (optional)
@@ -54,8 +54,6 @@ if uploaded_file:
     # Read the file
     data = pd.read_csv(uploaded_file)
    
-   
-
     # Check for missing values.
     total_count = data.size
     missing_count = data.isna().sum().sum()
@@ -561,11 +559,14 @@ if uploaded_file:
 
         st.pyplot(fig)
 
+        # Save processed data with the original file name appended with "_processed"
         processed_csv = processed_data.to_csv(index=False)
+        original_filename = uploaded_file.name  # e.g., "data.csv"
+        processed_filename = original_filename.rsplit(".", 1)[0] + "_processed.csv"
         st.download_button(
             label="Download Processed CSV",
             data=processed_csv,
-            file_name="processed_nmr_data.csv",
+            file_name=processed_filename,
             mime="text/csv"
         )
 else:
