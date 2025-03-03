@@ -7,19 +7,84 @@ Created on Mon Mar  3 14:48:41 2025
 """
 import streamlit as st
 
-st.set_page_config(page_title="Copié Group Streamlit Stats Tools", layout="wide")
+# Set the configuration for the page
+st.set_page_config(
+    page_title="Copié Group Streamlit Stats Tools",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-st.title("Welcome to the Copié Group Streamlit Stats Tools")
-st.write("Select a tool from the sidebar to begin your analysis.")
+# Main Title
+st.title("Copié Group Metabolomics Toolbox")
 
+# Introduction / Welcome Section
 st.markdown(
     """
-    **Available Tools:**
-    - **NMR Processing**: Normalization and processing of NMR metabolomics data
-    - **Outlier Detection**: PCA-based outlier detection
-    - **PCA Analysis**: Principal Component Analysis visualization
-    - **PLSDA Analysis**: Partial Least Squares Discriminant Analysis
-    
-    Use the sidebar to navigate between these tools.
+    Welcome to the **Copié Group Metabolomics Toolbox**, a collection of Streamlit-based applications 
+    designed to help you process, explore, and analyze metabolomics data quickly and efficiently. 
+
+    This platform provides a unified interface for:
+    - Data preprocessing (e.g., normalization, scaling, log transformation)
+    - Outlier detection
+    - Principal Component Analysis (PCA)
+    - Partial Least Squares Discriminant Analysis (PLS-DA)
+
+    Whether you're looking to clean and transform raw NMR data or to delve into multivariate statistical 
+    analyses, each tool is accessible from the sidebar to the left.
     """
+)
+
+# Overview of Tools
+st.markdown(
+    """
+    ---
+    ### Available Tools
+    
+    1. **NMR Processing**  
+       Normalize and transform NMR metabolomics datasets (e.g., log transformation, scaling, row-based normalization).
+       This helps ensure your data is ready for subsequent statistical analysis.
+       
+    2. **Outlier Detection**  
+       Quickly identify potential outliers via PCA-based methods (Hotelling T² and Mahalanobis distance), 
+       then download a summary or visual plot to verify and act on them.
+       
+    3. **PCA Analysis**  
+       Easily create 2D and 3D PCA plots, investigate variable loadings, and visualize group clustering. 
+       This tool also offers confidence ellipses, biplots, and interactive 3D visualizations.
+
+    4. **PLSDA Analysis**  
+       Perform Partial Least Squares Discriminant Analysis to classify and evaluate predictive power. 
+       Includes cross-validation, confusion matrices, and ROC curves (for binary classification).
+    ---
+    """
+)
+
+# Getting Started / Tips
+st.markdown(
+    """
+    ### Getting Started
+    1. **Upload Your Data**: Most tools expect a CSV file with samples, groups, and relevant features. 
+       Specific formatting requirements are listed on each tool's page.
+    2. **Configure Parameters**: Select your preprocessing or model options (e.g., log transformations, 
+       number of components, test splits, etc.).
+    3. **Review Outputs**: Plots, tables, and metrics are generated on-the-fly. 
+       Confusion matrices, ROC curves, PCA 2D/3D plots, and more can be explored.
+    4. **Download Results**: CSV outputs of processed data, outlier details, PCA/PLS-DA results, and 
+       other summaries are available for further offline analysis.
+
+    ### About Us
+    This toolbox is developed and maintained by the Copié Lab at [Your Institution Name], 
+    where we focus on advanced metabolomics research. 
+
+    For questions or suggestions, please contact:  
+    **[Your Name, Email, or Lab Website]**
+
+    ---
+    """
+)
+
+# Closing note
+st.info(
+    "Select a tool from the **sidebar** to begin your analysis. "
+    "You can return to this Home page any time by clicking 'Home' or the main title."
 )
