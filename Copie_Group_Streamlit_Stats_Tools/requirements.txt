@@ -3,7 +3,6 @@ matplotlib
 numpy
 pandas
 plotly
-random
 scipy
 seaborn
 sklearn
