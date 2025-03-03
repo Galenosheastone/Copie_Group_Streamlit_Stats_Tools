@@ -1,7 +1,6 @@
 adjustText
 matplotlib
 numpy
-os
 pandas
 plotly
 random
