@@ -5,5 +5,5 @@ pandas
 plotly
 scipy
 seaborn
-sklearn
+scikit-learn
 streamlit
