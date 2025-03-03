@@ -74,7 +74,7 @@ st.markdown(
 
     ### About Us
     This toolbox is developed and maintained by the Copié Lab at Montana State University, 
-    where we focus on advanced metabolomics research. 
+    where we focus on NMR metabolomics research. 
 
     For questions or suggestions, please contact:  
     Galen O'Shea-Stone @ galenosheastone@montana.edu
