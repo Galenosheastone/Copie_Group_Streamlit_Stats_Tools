@@ -1,5 +1,4 @@
 adjustText
-math
 matplotlib
 numpy
 os
