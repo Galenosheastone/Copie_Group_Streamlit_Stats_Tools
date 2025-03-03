@@ -77,7 +77,7 @@ st.markdown(
     where we focus on advanced metabolomics research. 
 
     For questions or suggestions, please contact:  
-    **Galen O'Shea-Stone @ galenosheastone@montana.edu **
+    Galen O'Shea-Stone @ galenosheastone@montana.edu
 
     ---
     """
