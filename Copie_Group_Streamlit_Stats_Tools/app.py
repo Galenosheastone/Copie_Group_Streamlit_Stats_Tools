@@ -73,11 +73,11 @@ st.markdown(
        other summaries are available for further offline analysis.
 
     ### About Us
-    This toolbox is developed and maintained by the Copié Lab at [Your Institution Name], 
+    This toolbox is developed and maintained by the Copié Lab at Montana State University, 
     where we focus on advanced metabolomics research. 
 
     For questions or suggestions, please contact:  
-    **[Your Name, Email, or Lab Website]**
+    **Galen O'Shea-Stone @ galenosheastone@montana.edu **
 
     ---
     """
