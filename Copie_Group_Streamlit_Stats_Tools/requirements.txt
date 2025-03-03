@@ -1,0 +1,12 @@
+adjustText
+math
+matplotlib
+numpy
+os
+pandas
+plotly
+random
+scipy
+seaborn
+sklearn
+streamlit
