@@ -1,5 +1,5 @@
 import streamlit as st
-st.set_page_config(page_title="Streamlit_NMR_Processing_v2.0.py", layout="wide")
+st.set_page_config(page_title="NMR_Processing_v2.0.py", layout="wide")
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
