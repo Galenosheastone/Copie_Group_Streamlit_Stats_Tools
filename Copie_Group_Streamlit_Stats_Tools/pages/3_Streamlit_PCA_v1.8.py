@@ -33,10 +33,12 @@ def hex_to_rgb(hex_color):
 # Helper functions for plotting 2D/3D confidence intervals #
 ############################################################
 
-def plot_confidence_ellipse(ax, pc1, pc2, color,
-                            fill=False,
-                            face_alpha=0.2,
-                            edge_alpha=1.0):
+def plot_confidence_ellipse(
+    ax, pc1, pc2, color,
+    fill=False,
+    face_alpha=0.2,
+    edge_alpha=1.0
+):
     """
     Plot a 95% confidence ellipse for given 2D points.
     
@@ -49,7 +51,7 @@ def plot_confidence_ellipse(ax, pc1, pc2, color,
     pc2 : array-like
         The y-coordinates (PC2) of the data points for a given group.
     color : tuple
-        An RGB tuple (values between 0 and 1) to color the ellipse.
+        An RGB tuple (values between 0 and 1) to color the ellipse edge (and fill if fill=True).
     fill : bool
         If True, shade the interior of the ellipse.
     face_alpha : float
@@ -72,15 +74,15 @@ def plot_confidence_ellipse(ax, pc1, pc2, color,
         height=height,
         angle=angle,
         edgecolor=color,
-        facecolor="none",  # Default no fill
-        lw=2
+        facecolor="none",
+        lw=2,
+        zorder=2  # So ellipse stays behind scatter points
     )
     # Set separate alpha for edge
     ellipse.set_alpha(edge_alpha)
 
-    # If user wants to shade
+    # If user wants to shade, set a fill color with partial transparency
     if fill:
-        # Convert color to RGBA tuple with specified face_alpha
         ellipse.set_facecolor(mcolors.to_rgba(color, face_alpha))
 
     ax.add_patch(ellipse)
@@ -136,7 +138,6 @@ def make_3d_ellipsoid(pc1, pc2, pc3, color, name="Ellipsoid", opacity=0.15):
 # Streamlit App
 ############################################################
 
-# Set Streamlit app title
 st.title("PCA Analysis and Visualization App")
 
 # Upload dataset
@@ -197,15 +198,26 @@ if uploaded_file:
     # **2D PCA Plot**
     st.subheader("2D PCA Plot")
     fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Plot each group
     for group, color in group_color_map.items():
         subset = pca_df[pca_df['Group'] == group]
-        ax.scatter(subset['PC1'], subset['PC2'], color=[color], label=group, alpha=0.7)
+        # Scatter points first (higher zorder so points stay on top)
+        ax.scatter(
+            subset['PC1'],
+            subset['PC2'],
+            color=[color],
+            label=group,
+            alpha=0.7,
+            zorder=3
+        )
+        # If user checked "Show 95% CI"
         if show_ci:
             plot_confidence_ellipse(
                 ax,
                 subset['PC1'],
                 subset['PC2'],
-                color,
+                color=color,  
                 fill=shade_2d_ci,
                 face_alpha=face_alpha_2d,
                 edge_alpha=1.0
@@ -245,13 +257,13 @@ if uploaded_file:
                 zaxis_title=f"PC3 ({explained_var[2]:.2f}% Variance)"
             ),
             title="3D PCA Plot",
-            width=800, height=600
+            width=800,
+            height=600
         )
         st.plotly_chart(fig)
 
     # **Loadings Visualization for First Three Components**
     st.subheader("Loadings Visualization for First Three Principal Components")
-
     fig, ax = plt.subplots(figsize=(8, 6))
     loadings = pca.components_.T
 
@@ -274,24 +286,34 @@ if uploaded_file:
 
     # **2D Biplot**
     st.subheader("2D PCA Biplot")
-    top_indices = np.argsort(np.sqrt(loadings[:, 0]**2 + loadings[:, 1]**2))[-top_n_metabolites:]
+    top_indices = np.argsort(
+        np.sqrt(loadings[:, 0]**2 + loadings[:, 1]**2)
+    )[-top_n_metabolites:]
 
     fig, ax = plt.subplots(figsize=(8, 6))
+    # Plot points
     for group, color in group_color_map.items():
         subset = pca_df[pca_df['Group'] == group]
-        ax.scatter(subset['PC1'], subset['PC2'], color=[color], label=group, alpha=0.7)
+        ax.scatter(
+            subset['PC1'],
+            subset['PC2'],
+            color=[color],
+            label=group,
+            alpha=0.7,
+            zorder=3
+        )
         if show_ci:
             plot_confidence_ellipse(
                 ax,
                 subset['PC1'],
                 subset['PC2'],
-                color,
+                color=color,
                 fill=shade_2d_ci,
                 face_alpha=face_alpha_2d,
                 edge_alpha=1.0
             )
 
-    # Collect text objects for adjust_text
+    # Draw arrows for top metabolites
     texts = []
     for i in top_indices:
         ax.arrow(
@@ -299,18 +321,20 @@ if uploaded_file:
             loadings[i, 0] * (3 * vector_scale),
             loadings[i, 1] * (3 * vector_scale),
             color='red',
-            alpha=0.5
+            alpha=0.5,
+            head_width=0.02,
+            length_includes_head=True
         )
         txt = ax.text(
             loadings[i, 0] * (3.5 * vector_scale),
             loadings[i, 1] * (3.5 * vector_scale),
             X.columns[i],
             color='red',
-            fontsize=9
+            fontsize=9,
+            zorder=4
         )
         texts.append(txt)
 
-    # Use adjust_text to reduce overlapping labels
     adjust_text(
         texts,
         ax=ax,
@@ -325,24 +349,42 @@ if uploaded_file:
 
     # **Interactive 3D Biplot with Labels**
     st.subheader("Interactive 3D Biplot")
-    # Recompute top_indices for 3D
     if n_components == 3:
-        top_indices = np.argsort(np.sqrt(loadings[:, 0]**2 + loadings[:, 1]**2 + loadings[:, 2]**2))[-top_n_metabolites:]
+        top_indices = np.argsort(
+            np.sqrt(
+                loadings[:, 0]**2
+                + loadings[:, 1]**2
+                + loadings[:, 2]**2
+            )
+        )[-top_n_metabolites:]
     else:
-        top_indices = np.argsort(np.sqrt(loadings[:, 0]**2 + loadings[:, 1]**2))[-top_n_metabolites:]
+        top_indices = np.argsort(
+            np.sqrt(loadings[:, 0]**2 + loadings[:, 1]**2)
+        )[-top_n_metabolites:]
 
     fig = go.Figure()
     for group, color in group_color_map.items():
         subset = pca_df[pca_df['Group'] == group]
-        fig.add_trace(go.Scatter3d(
-            x=subset['PC1'], y=subset['PC2'], z=subset['PC3'] if n_components == 3 else [0]*len(subset),
-            mode='markers',
-            marker=dict(size=6, color=f'rgb{tuple(int(c*255) for c in color)}', opacity=0.7),
-            name=group
-        ))
+        z_vals = subset['PC3'] if n_components == 3 else [0]*len(subset)
+        fig.add_trace(
+            go.Scatter3d(
+                x=subset['PC1'],
+                y=subset['PC2'],
+                z=z_vals,
+                mode='markers',
+                marker=dict(
+                    size=6,
+                    color=f'rgb{tuple(int(c*255) for c in color)}',
+                    opacity=0.7
+                ),
+                name=group
+            )
+        )
         if (n_components == 3) and show_ci:
             ellipsoid_surf = make_3d_ellipsoid(
-                subset['PC1'], subset['PC2'], subset['PC3'],
+                subset['PC1'],
+                subset['PC2'],
+                subset['PC3'],
                 color,
                 name=f"{group} 95% CI",
                 opacity=ellipsoid_opacity
@@ -351,7 +393,6 @@ if uploaded_file:
 
     # Arrows for top loadings
     for i in top_indices:
-        # If only 2 PCs, plot a "3D" line in 2D plane: z=0
         z_val = loadings[i, 2] if n_components == 3 else 0
         fig.add_trace(go.Scatter3d(
             x=[0, loadings[i, 0] * (10 * vector_scale)],
@@ -364,7 +405,6 @@ if uploaded_file:
             showlegend=False
         ))
 
-    # Update layout
     fig.update_layout(
         scene=dict(
             xaxis_title=f"PC1 ({explained_var[0]:.2f}% Variance)",
