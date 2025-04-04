@@ -1,12 +1,11 @@
 import streamlit as st
-st.set_page_config(page_title="Streamlit_NMR_Processing_v2.2.py", layout="wide")
+st.set_page_config(page_title="Streamlit_NMR_Processing_v2.0.py", layout="wide")
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import random
 import scipy.stats as stats
-
 
 st.title("Copié Lab NMR Metabolomics Data Processing Streamlit App")
 """
@@ -545,4 +544,3 @@ if uploaded_file:
         )
 else:
     st.write("Please upload a CSV file to proceed.")
-
