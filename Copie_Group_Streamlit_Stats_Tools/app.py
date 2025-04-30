@@ -49,11 +49,6 @@ st.markdown(
        Normalize and transform NMR metabolomics datasets (e.g., log transformation, scaling, row-based normalization).
        This helps ensure your data is ready for subsequent statistical analysis.
        
-    X. **Outlier Detection**  
-       Quickly identify potential outliers via PCA-based methods (Hotelling T² and Mahalanobis distance), 
-       then download a summary or visual plot to verify and act on them 
-       **NOTE THIS IS NOT INCLUDED IN THIS VERSION DUE TO PROCESSING REQS** Please contact GOS to get access to this tool 
-
     2. **Pairwise analysis**  
         Choose between t-test (parametric) and Mann-Whitney U (non-parametric) pairwise tests. Quickly make publication
         quality figures of all significant metaboloites, with the ability to choose rows & columns, or export single
@@ -66,6 +61,13 @@ st.markdown(
     4. **PLSDA Analysis**  
        Perform Partial Least Squares Discriminant Analysis to classify and evaluate predictive power. 
        Includes cross-validation, confusion matrices, and ROC curves (for binary classification).
+
+        X. **Outlier Detection**  
+       Quickly identify potential outliers via PCA-based methods (Hotelling T² and Mahalanobis distance), 
+       then download a summary or visual plot to verify and act on them 
+       **NOTE THIS IS NOT INCLUDED IN THIS VERSION DUE TO PROCESSING REQS** 
+       Please contact galenoshea@gmail.com to get access to this tool 
+
     ---
     """
 )
