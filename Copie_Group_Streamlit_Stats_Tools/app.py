@@ -22,10 +22,8 @@ st.markdown(
     """
     Welcome to the **Copié Group Metabolomics Toolbox**, a collection of Streamlit-based applications 
     designed to help you process, explore, and analyze NMR metabolomics data quickly and efficiently. 
-    The Copié Lab is located at Montana State University in the Department of Chemistry and Biochemistry
+    The Copié Lab is located at Montana State University in the Department of Chemistry and Biochemistry in Bozeman Montana
     
-    This app was created and is maintained by @galenosheastone@montana.edu
-
     This platform provides a unified interface for:
     - Data preprocessing (e.g., normalization, scaling, log transformation)
     - Outlier detection (not included in this release) 
