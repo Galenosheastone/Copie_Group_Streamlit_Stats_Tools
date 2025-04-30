@@ -7,3 +7,4 @@ scipy
 seaborn
 scikit-learn
 streamlit
+statannot
