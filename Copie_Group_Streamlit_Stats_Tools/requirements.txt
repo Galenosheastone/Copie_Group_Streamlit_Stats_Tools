@@ -6,6 +6,6 @@ plotly
 scipy
 seaborn
 scikit-learn
-streamlit
+streamlit==latest
 statannotations
 statsmodels
