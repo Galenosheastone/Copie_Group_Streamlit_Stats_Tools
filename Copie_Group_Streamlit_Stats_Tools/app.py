@@ -26,6 +26,7 @@ st.markdown(
     This platform provides a unified interface for:
     - Data preprocessing (e.g., normalization, scaling, log transformation)
     - Outlier detection
+    - Pairwise analysis (t-test & MannWhitU) 
     - Principal Component Analysis (PCA)
     - Partial Least Squares Discriminant Analysis (PLS-DA)
 
@@ -44,9 +45,15 @@ st.markdown(
        Normalize and transform NMR metabolomics datasets (e.g., log transformation, scaling, row-based normalization).
        This helps ensure your data is ready for subsequent statistical analysis.
        
-    2. **Outlier Detection**  
+    X. **Outlier Detection**  
        Quickly identify potential outliers via PCA-based methods (Hotelling T² and Mahalanobis distance), 
-       then download a summary or visual plot to verify and act on them.
+       then download a summary or visual plot to verify and act on them 
+       **NOTE THIS IS NOT INCLUDED IN THIS VERSION DUE TO PROCESSING REQS** Please contact GOS to get access to this tool 
+
+    2. **Pairwise analysis**  
+        Choose between t-test (parametric) and Mann-Whitney U (non-parametric) pairwise tests. Quickly make publication
+        quality figures of all significant metaboloites, with the ability to choose rows & columns, or export single
+        metabolite figures. 
        
     3. **PCA Analysis**  
        Easily create 2D and 3D PCA plots, investigate variable loadings, and visualize group clustering. 
