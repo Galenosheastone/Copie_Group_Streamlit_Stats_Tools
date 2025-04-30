@@ -8,4 +8,3 @@ seaborn
 scikit-learn
 streamlit
 statannotations
-statsmodel
