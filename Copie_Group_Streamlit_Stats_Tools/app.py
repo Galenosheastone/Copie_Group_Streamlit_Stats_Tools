@@ -28,10 +28,11 @@ st.markdown(
 
     This platform provides a unified interface for:
     - Data preprocessing (e.g., normalization, scaling, log transformation)
-    - Outlier detection
+    - Outlier detection (not included in this release) 
     - Pairwise analysis (t-test & MannWhitU) 
     - Principal Component Analysis (PCA)
     - Partial Least Squares Discriminant Analysis (PLS-DA)
+
 
     Whether you're looking to clean and transform raw NMR data or to delve into multivariate statistical 
     analyses, each tool is accessible from the sidebar to the left.
