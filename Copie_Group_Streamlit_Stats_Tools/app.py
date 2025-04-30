@@ -89,8 +89,9 @@ st.markdown(
     This toolbox is developed and maintained by the Copié Lab at Montana State University, 
     where we focus on NMR metabolomics research. 
 
+    This app was created and is maintained by Galen O'Shea-Stone 
     For questions or suggestions, please contact:  
-    Galen O'Shea-Stone @ galenosheastone@montana.edu
+    @ galenosheastone@montana.edu
 
     ---
     """
