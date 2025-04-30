@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # Main Title
-st.title("Copié Group Metabolomics Toolbox")
+st.title("✨ Copié Group Metabolomics Toolbox ✨")
 
 # Introduction / Welcome Section
 st.markdown(
