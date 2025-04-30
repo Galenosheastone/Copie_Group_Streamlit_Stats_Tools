@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Feb 12 16:25:01 2025
-@author: Galen O'Shea-Stone'
+@author: Galen O'Shea-Stone
 """
 
 import streamlit as st
@@ -102,6 +102,9 @@ def hex_to_rgb(hex_color):
     return tuple(int(hex_color[i:i+2], 16)/255.0 for i in (0, 2, 4))
 
 def plot_confidence_ellipse(ax, x, y, color, edge_alpha=1.0, fill=False):
+    """
+    Plot a 95% confidence ellipse based on the data points in x and y.
+    """
     mean_x, mean_y = np.mean(x), np.mean(y)
     cov = np.cov(x, y)
     eigvals, eigvecs = np.linalg.eig(cov)
@@ -110,14 +113,30 @@ def plot_confidence_ellipse(ax, x, y, color, edge_alpha=1.0, fill=False):
     angle = np.degrees(np.arctan2(*eigvecs[:, 0][::-1]))
     chi2_val = chi2.ppf(0.95, 2)
     width, height = 2 * np.sqrt(eigvals * chi2_val)
+
+    # Use keyword-only arguments to avoid positional mismatch
     if fill:
-        ell = Ellipse((mean_x, mean_y), width, height, angle,
-                      edgecolor=color, facecolor=color,
-                      lw=2, alpha=edge_alpha)
+        ell = Ellipse(
+            xy=(mean_x, mean_y),
+            width=width,
+            height=height,
+            angle=angle,
+            edgecolor=color,
+            facecolor=color,
+            lw=2,
+            alpha=edge_alpha
+        )
     else:
-        ell = Ellipse((mean_x, mean_y), width, height, angle,
-                      edgecolor=color, facecolor='none',
-                      lw=2, alpha=edge_alpha)
+        ell = Ellipse(
+            xy=(mean_x, mean_y),
+            width=width,
+            height=height,
+            angle=angle,
+            edgecolor=color,
+            facecolor='none',
+            lw=2,
+            alpha=edge_alpha
+        )
     ax.add_patch(ell)
 
 
