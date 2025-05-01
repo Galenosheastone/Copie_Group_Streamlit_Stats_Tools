@@ -6,10 +6,10 @@ Created on 2025-05-01
 Author: Galen O'Shea-Stone (updated by ChatGPT)
 """
 
+# ───────────────────────────────────────── Imports ──────────────────────────────────────────
 import streamlit as st
 st.set_page_config(page_title="3_Streamlit_PCA_v2.0", layout="wide")
 
-# ───────────────────────────────────────── Imports ──────────────────────────────────────────
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -167,7 +167,7 @@ with st.expander("2-D PCA plot", expanded=True):
     ax.set_ylabel(f"PC2 ({expl_var[1]:.1f} %)")
     ax.legend(title="Group")
     ax.grid(True)
-    st.pyplot(fig2d)          # ← no clear_figure
+    st.pyplot(fig2d)
 
 # ───────────────────────────────────────── 3-D PCA plot ────────────────────────────────────
 if enable_3d and n_components == 3:
@@ -198,7 +198,7 @@ if enable_3d and n_components == 3:
         )
         st.plotly_chart(fig3d, use_container_width=True)
 
-# ───────────────────────────────────────── Loadings heatmap ────────────────────────────────
+# ───────────────────────────────────────── Loadings heat-map ───────────────────────────────
 with st.expander("Loadings heat-map"):
     pcs       = min(n_components, 3)
     load_df   = pd.DataFrame(
@@ -223,7 +223,6 @@ with st.expander("2-D PCA biplot"):
         if show_ci:
             plot_confidence_ellipse(ax, sub["PC1"], sub["PC2"], rgb, ci_alpha)
 
-    # metabolite vectors
     loadings = pca.components_.T
     idx = np.argsort(np.hypot(loadings[:, 0], loadings[:, 1]))[-top_n_metabolites:]
     texts = []
@@ -258,7 +257,6 @@ if enable_3d and n_components == 3:
                     sub["PC1"], sub["PC2"], sub["PC3"],
                     rgb, name=f"{grp} CI", opacity=ellipsoid_alpha
                 ))
-        # vectors
         loadings = pca.components_.T
         idx3 = np.argsort(np.linalg.norm(loadings[:, :3], axis=1))[-top_n_metabolites:]
         for i in idx3:
