@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Streamlit app – Data-driven pair-wise tests & visualisation (v2.2, 2025-05-02)
+Streamlit app – Data-driven pair-wise tests & visualisation (v2.3, 2025-05-02)
 Author   : Galen O'Shea-Stone (original), ChatGPT (streamlit port & fixes)
 Changes  : • Persistent colour pickers
            • Session-state flag so figures survive colour tweaks
            • Unified legend with adjustable font size
+           • Toggle legend on/off option
 """
 from __future__ import annotations
 import io, hashlib, itertools, re
@@ -102,7 +103,7 @@ def pw_and_fdr(
 
 @st.cache_resource
 def overview_png(
-    m, sig, palette, rows, cols, fs, annot, legend_fs
+    m, sig, palette, rows, cols, fs, annot, legend_fs, show_legend
 ) -> bytes:
     mets  = list(sig.keys())
     pairs = [tuple(c.split(" vs ")) for c in sig[mets[0]]]
@@ -130,24 +131,27 @@ def overview_png(
         ax.set_xticklabels([])
     for ax in axes[len(mets):]:
         ax.axis("off")
-    # Unified legend
-    handles = [
-        plt.Line2D(
-            [], [], marker="s", linestyle="",
-            markersize=10, markerfacecolor=palette[g],
-            markeredgecolor="k"
-        ) for g in palette
-    ]
-    labels = list(palette.keys())
-    fig.legend(
-        handles, labels,
-        loc="lower center",
-        bbox_to_anchor=(0.5, -0.02),
-        ncol=len(labels),
-        fontsize=legend_fs,
-        frameon=False
-    )
-    plt.subplots_adjust(bottom=0.12 + legend_fs/200)
+    # Unified legend (optional)
+    if show_legend:
+        handles = [
+            plt.Line2D(
+                [], [], marker="s", linestyle="",
+                markersize=10, markerfacecolor=palette[g],
+                markeredgecolor="k"
+            ) for g in palette
+        ]
+        labels = list(palette.keys())
+        fig.legend(
+            handles, labels,
+            loc="lower center",
+            bbox_to_anchor=(0.5, -0.02),
+            ncol=len(labels),
+            fontsize=legend_fs,
+            frameon=False
+        )
+        plt.subplots_adjust(bottom=0.12 + legend_fs/200)
+    else:
+        plt.subplots_adjust(bottom=0.05)
     buf = io.BytesIO()
     fig.savefig(buf, dpi=300, bbox_inches="tight")
     return buf.getvalue()
@@ -201,6 +205,8 @@ for i, g in enumerate(groups):
 # Slider for legend font size
 def_legend_fs = fs
 legend_fs = st.sidebar.slider("Legend font size", 6, 30, def_legend_fs)
+# Checkbox to show/hide legend
+show_legend = st.sidebar.checkbox("Show legend", value=True)
 
 # Combined overview plot
 n_sig = len(Sig)
@@ -214,7 +220,7 @@ if n_sig:
     annot_name = "t-test_ind" if choice == "t-test" else "Mann-Whitney"
     png        = overview_png(
                    m, Sig, palette, rows, cols, fs,
-                   annot_name, legend_fs
+                   annot_name, legend_fs, show_legend
                  )
     st.image(png, use_container_width=True)
     st.download_button("Download overview PNG", png, "overview.png", "image/png")
