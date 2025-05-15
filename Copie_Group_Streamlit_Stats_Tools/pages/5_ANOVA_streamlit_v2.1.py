@@ -84,7 +84,7 @@ for met in df_melt['Metabolite'].unique():
     sub = df_melt[df_melt['Metabolite'] == met]
     model = ols(f"Value ~ C({group_col})", data=sub).fit()
     aov = sm.stats.anova_lm(model, typ=2)
-    pval = aov['PR(>F)'][0]
+    pval = aov['PR(>F)'].iloc[0]
     results.append({'Metabolite': met, 'p_value': pval})
 res_df = pd.DataFrame(results)
 # Adjust p-values
@@ -99,33 +99,32 @@ st.dataframe(res_sorted)
 
 # Heatmap of top metabolites
 st.subheader(f"Clustered Heatmap of Top {top_n} Metabolites")
-pivot = df_melt[df_melt['Metabolite'].isin(sig_metabolites)] \
-    .pivot(index=sample_col, columns=group_col, values='Value')
-fig1, ax1 = plt.subplots(figsize=(8, 6))
-sns.heatmap(pivot, cmap='vlag', ax=ax1)
+heatmap_df = (
+    df_melt[df_melt['Metabolite'].isin(sig_metabolites)]
+    .pivot_table(index='Metabolite', columns=group_col, values='Value', aggfunc='mean')
+)
+fig1, ax1 = plt.subplots(figsize=(len(unique_groups)*1.2, top_n*0.6 if top_n>1 else 6))
+sns.heatmap(heatmap_df, cmap='vlag', ax=ax1)
 st.pyplot(fig1)
 
-# Boxplots
+# Boxplots of top metabolites
 st.subheader("Boxplots of Top Metabolites")
 fig2, ax2 = plt.subplots(figsize=(max(6, top_n*1.2), 6))
-sns.boxplot(data=df_melt[df_melt['Metabolite'].isin(sig_metabolites)],
-            x='Metabolite', y='Value', hue=group_col, palette=palette, ax=ax2)
+sns.boxplot(
+    data=df_melt[df_melt['Metabolite'].isin(sig_metabolites)],
+    x='Metabolite', y='Value', hue=group_col, palette=palette, ax=ax2
+)
 if rotate_labels:
     plt.setp(ax2.get_xticklabels(), rotation=45, ha='right')
 
 # Optional pairwise annotations
 if STATANNOT and show_pairwise:
-    pairs = []
-    groups = unique_groups
-n_met = len(sig_metabolites)
-for idx in range(n_met):
-    met = sig_metabolites[idx]
-    data_sub = df_melt[df_melt['Metabolite']==met]
-    # generate all pair combinations
     from itertools import combinations
-    combos = list(combinations(groups, 2))
-    annot = Annotator(ax2, combos, data=data_sub, x='Metabolite', y='Value', hue=group_col)
-    annot.configure(test='t-test_ind', text_format='star', loc='outside').apply_and_annotate()
+    for met in sig_metabolites:
+        data_sub = df_melt[df_melt['Metabolite'] == met]
+        pairs = list(combinations(unique_groups, 2))
+        annot = Annotator(ax2, pairs, data=data_sub, x='Metabolite', y='Value', hue=group_col)
+        annot.configure(test='t-test_ind', text_format='star', loc='outside').apply_and_annotate()
 
 st.pyplot(fig2)
 
