@@ -120,11 +120,17 @@ if rotate_labels:
 # Optional pairwise annotations
 if STATANNOT and show_pairwise:
     from itertools import combinations
-    for met in sig_metabolites:
-        data_sub = df_melt[df_melt['Metabolite'] == met]
+    try:
         pairs = list(combinations(unique_groups, 2))
-        annot = Annotator(ax2, pairs, data=data_sub, x='Metabolite', y='Value', hue=group_col)
+        annot = Annotator(
+            ax2,
+            pairs,
+            data=df_melt[df_melt['Metabolite'].isin(sig_metabolites)],
+            x='Metabolite', y='Value', hue=group_col
+        )
         annot.configure(test='t-test_ind', text_format='star', loc='outside').apply_and_annotate()
+    except Exception as e:
+        st.warning(f"Could not apply pairwise annotations: {e}")
 
 st.pyplot(fig2)
 
