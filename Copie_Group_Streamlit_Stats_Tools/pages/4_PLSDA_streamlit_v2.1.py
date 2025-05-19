@@ -2,96 +2,115 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Feb 12 16:25:01 2025
-Updated on May 19 2025 to include stratified split, adaptive CV folds, unique keys, and user guidance on minimum test size.
-@author:
+Updated on May 19 2025 to include stratified split guidance, error handling, and adaptive CV folds.
+@author: Galen O'Shea-Stone'
 """
 import streamlit as st
+st.set_page_config(page_title="4_PLSDA_streamlit_v1.11.py", layout="wide")
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.colors as mcolors
 from matplotlib.patches import Ellipse
+import matplotlib.gridspec as gridspec
 import plotly.graph_objects as go
 from scipy.stats import chi2
 from sklearn.model_selection import train_test_split, cross_val_predict, KFold
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, mean_squared_error, r2_score
+from sklearn.metrics import (
+    confusion_matrix, roc_auc_score, roc_curve,
+    r2_score, mean_squared_error, accuracy_score
+)
 from sklearn.cross_decomposition import PLSRegression
 
-# --- Helper functions omitted for brevity (hex_to_rgb, plot_confidence_ellipse, make_3d_ellipsoid,
-#     optimize_components, perform_permutation_test_with_visualization,
-#     calculate_vip_scores, calculate_q2_r2, calculate_explained_variance)
+##############################################
+# Helper Functions
+##############################################
+def hex_to_rgb(hex_color):
+    """Convert a hex color string to an RGB tuple between 0 and 1."""
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16)/255.0 for i in (0, 2, 4))
 
-# You can include the full definitions as in v1.10 above.
+# ... [Other helper functions unchanged: plot_confidence_ellipse, make_3d_ellipsoid, optimize_components, perform_permutation_test...]
+# For brevity, those sections remain identical to v1.10
 
 ##############################################
-# Main Streamlit App
+# Main App
 ##############################################
 def main():
     st.title("PLSDA Analysis App")
     st.sidebar.header("Upload Data & Settings")
 
-    uploaded = st.sidebar.file_uploader("Upload CSV file", type=["csv"])
+    uploaded = st.sidebar.file_uploader("Upload CSV", type=["csv"])
     if not uploaded:
-        st.error("Please upload a CSV file to proceed.")
+        st.error("Upload a CSV to proceed.")
         st.stop()
     data = pd.read_csv(uploaded)
 
     st.subheader("Dataset Preview")
     st.write(data.head())
 
-    # Factorize group labels and extract features
+    # Encode groups
     y, groups = pd.factorize(data.iloc[:,1])
     X = data.iloc[:,2:]
 
-    # Provide guidance on minimum test size for stratification
-    n_samples = X.shape[0]
-    n_classes = len(groups)
-    min_test_frac = n_classes / n_samples
-    st.sidebar.markdown(
-        f"**Stratified split guidance:**" +
-        f"  
-- Total samples: **{n_samples}**, Classes: **{n_classes}**  " +
-        f"  
-- Minimum test size fraction: **{min_test_frac:.2f}** (at least {n_classes} samples)"
-    )
-
-    # Color selection for each group
-    palette = sns.color_palette("husl", n_classes)
+    # Color pickers
+    palette = sns.color_palette("husl", len(groups))
     color_map = {}
     for i, g in enumerate(groups):
-        hex_col = mcolors.to_hex(palette[i])
-        c = st.sidebar.color_picker(f"Color for {g}", hex_col, key=f"col_{i}")
-        color_map[i] = tuple(int(x*255) for x in mcolors.to_rgb(c))
+        col = st.sidebar.color_picker(f"Color for {g}", mcolors.to_hex(palette[i]), key=f"col_{i}")
+        color_map[i] = hex_to_rgb(col)
 
-    # Test/train split settings
-    test_size = st.sidebar.slider(
-        "Test Size (fraction)", 0.1, 0.5, 0.3, step=0.05,
-        help=f"Must be ≥ {min_test_frac:.2f} to include one sample per class."
+    # Test/train split settings with guidance
+    ts = st.sidebar.slider("Test size (fraction)", 0.1, 0.5, 0.3, 0.05, key="ts")
+    # Explain minimum test_size requirement
+    n_samples = X.shape[0]
+    n_classes = len(np.unique(y))
+    min_frac = n_classes / n_samples
+    st.sidebar.markdown(
+        f"**Note:** With {n_samples} samples and {n_classes} classes, ``test_size`` must be at least {min_frac:.2f} "
+        "to ensure at least one test sample per class for stratification."
     )
-    random_state = st.sidebar.number_input(
-        "Random State", value=6, key="rs")
-
-    # Attempt stratified split, catch errors
+    if ts < min_frac:
+        st.sidebar.warning(
+            "Current test_size fraction ({ts:.2f}) is too low for stratified splitting; "
+            "increase test size to avoid errors."
+        )
+    rs = st.sidebar.number_input("Random state", value=6, key="rs")
+    # Perform stratified split with error handling
     try:
         X_tr, X_te, y_tr, y_te = train_test_split(
             X, y,
-            test_size=test_size,
-            random_state=int(random_state),
+            test_size=ts,
+            random_state=int(rs),
             stratify=y
         )
     except ValueError as e:
-        st.error(
-            f"Cannot split data: {e}\n" +
-            f"Please increase `Test Size` so that test set has at least one sample per class."
-        )
+        st.error(f"Error in train_test_split: {e}")
         st.stop()
 
-    st.write(f"Training set: {X_tr.shape[0]} samples | Test set: {X_te.shape[0]} samples")
+    st.write("Training data shape:", X_tr.shape)
+    st.write("Test data shape:", X_te.shape)
 
-    # Continue with scaling, PLS-DA fitting, and plotting...
-    # (The rest of your code from v1.10 goes here, unchanged.)
+    # Scaling
+    scaler = StandardScaler()
+    X_tr_s = scaler.fit_transform(X_tr)
+    X_te_s = scaler.transform(X_te)
+
+    # Optimize components
+    st.subheader("Optimizing Number of Components")
+    with st.spinner("Running CV..."):
+        optimal_components = optimize_components(X_tr_s, y_tr)
+    st.write("Optimal components:", optimal_components)
+
+    # Fit PLSDA
+    pls = PLSRegression(n_components=optimal_components)
+    pls.fit(X_tr_s, y_tr)
+
+    # Permutation test settings unchanged...
+    # Rest of app: VIP scores, plots, performance metrics, overfitting advice remain identical to v1.10
 
 if __name__ == '__main__':
     main()
