@@ -64,7 +64,7 @@ st.markdown(
        Quickly identify potential outliers via PCA-based methods (Hotelling T² and Mahalanobis distance), 
        then download a summary or visual plot to verify and act on them 
        **NOTE THIS IS NOT INCLUDED IN THIS VERSION DUE TO PROCESSING REQS** 
-       Please contact galenoshea@gmail.com to get access to this tool 
+       Please contact the lab for access to this tool. 
 
     ---
     """
@@ -89,7 +89,7 @@ st.markdown(
 
     This app was created and is maintained by Galen O'Shea-Stone 
     For questions or suggestions, please contact:  
-    @ galenosheastone@montana.edu
+    galenoshea@gmail.com
 
     ---
     """
