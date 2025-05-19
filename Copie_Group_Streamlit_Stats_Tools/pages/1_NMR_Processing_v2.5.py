@@ -3,7 +3,7 @@
 """
 Created on Fri Apr  4 16:13:13 2025
 Updated on Apr 30 2025 to add Streamlit caching and figure cleanup
-Last edit on May 19 2025 – dynamic filename based on normalization
+Last edit on May 19 2025 – dynamic filename based on normalization, log, and scaling
 @author: Galen O'Shea-Stone
 """
 
@@ -20,7 +20,7 @@ import scipy.stats as stats
 from statannotations.Annotator import Annotator
 
 # -------------------------------------------------------------------------
-# NEW – helper to keep filenames tidy
+# HELPER – keep filename tags tidy
 # -------------------------------------------------------------------------
 def sanitize_label(label: str) -> str:
     """Remove spaces/parentheses/dashes and lowercase for filenames."""
@@ -50,14 +50,12 @@ This app helps you:
 
 @st.cache_data(show_spinner=False)
 def load_and_clean(uploaded_file):
-    """Read CSV once, replace 'ND', coerce numerics."""
     df = pd.read_csv(uploaded_file)
     df.replace('ND', np.nan, inplace=True)
     return df.apply(pd.to_numeric, errors='ignore')
 
 @st.cache_data(show_spinner=False)
 def original_imputed(data: pd.DataFrame, numeric_columns):
-    """Impute zeros/NaN with 1/5 min positive per column."""
     df = data.copy()
     min_pos_vals = df[numeric_columns].apply(min_pos)
     for col in numeric_columns:
@@ -68,12 +66,10 @@ def original_imputed(data: pd.DataFrame, numeric_columns):
 
 @st.cache_data(show_spinner=False)
 def cached_transform(data: pd.DataFrame, numeric_columns, normalization_method, do_log_transform, scaling_method):
-    """Wrap apply_transformations for caching."""
     return apply_transformations(data, numeric_columns, normalization_method, do_log_transform, scaling_method)
 
 @st.cache_data(show_spinner=False)
 def cached_compute_metrics(processed_df: pd.DataFrame, numeric_columns, do_mardia, do_anderson):
-    """Wrap compute_normality_metrics for caching."""
     return compute_normality_metrics(processed_df, numeric_columns, do_mardia, do_anderson)
 
 #############################
@@ -92,23 +88,19 @@ def apply_transformations(
     scaling_method: str
 ) -> pd.DataFrame:
     df = data.copy()
-    # 1) replace 0/NaN
     mp = df[numeric_columns].apply(min_pos)
     for col in numeric_columns:
         rp = mp[col]
         if pd.notna(rp):
             df[col] = df[col].replace(0, np.nan).fillna(rp)
-    # 2) normalization
     if normalization_method == "Sum":
         rs = df[numeric_columns].sum(axis=1).replace(0, np.nan)
         df[numeric_columns] = df[numeric_columns].div(rs, axis=0)
     elif normalization_method == "Median":
         rm = df[numeric_columns].median(axis=1).replace(0, np.nan)
         df[numeric_columns] = df[numeric_columns].div(rm, axis=0)
-    # 3) log
     if do_log_transform:
         df[numeric_columns] = np.log(df[numeric_columns])
-    # 4) scaling
     for col in numeric_columns:
         col_data = df[col]
         if scaling_method == "Mean-center":
@@ -145,10 +137,10 @@ def compute_normality_metrics(
             else:
                 ad_success.append(np.nan)
         else:
-            skew_list.append(np.nan)
-            kurt_list.append(np.nan)
-            shapiro_ps.append(np.nan)
-            ad_success.append(np.nan)
+            skew_list.extend([np.nan])
+            kurt_list.extend([np.nan])
+            shapiro_ps.extend([np.nan])
+            ad_success.extend([np.nan])
 
     avg_skew = np.nanmean(skew_list)
     avg_kurt = np.nanmean(kurt_list)
@@ -160,11 +152,11 @@ def compute_normality_metrics(
         mardia = abs(stats.skew(X.values.flatten())) if X.shape[0] > 3 else np.nan
 
     return {
-        'avg_abs_skew': avg_skew,
+        'avg_abs_skew':        avg_skew,
         'avg_excess_kurtosis': avg_kurt,
-        'proportion_shapiro': prop_sh,
-        'mardia_stat': mardia,
-        'prop_anderson': prop_ad
+        'proportion_shapiro':  prop_sh,
+        'mardia_stat':         mardia,
+        'prop_anderson':       prop_ad
     }
 
 def advanced_ranking(df: pd.DataFrame, do_mardia: bool, do_anderson: bool) -> pd.DataFrame:
@@ -176,8 +168,8 @@ def advanced_ranking(df: pd.DataFrame, do_mardia: bool, do_anderson: bool) -> pd
         if metric in rank_df:
             rank_df[f"{metric}_rank"] = rank_df[metric].rank(method='min', ascending=(direction=='asc'))
     ranks = [c for c in rank_df if c.endswith('_rank')]
-    rank_df['rank_sum']    = rank_df[ranks].sum(axis=1)
-    rank_df['overall_rank']= rank_df['rank_sum'].rank(method='min')
+    rank_df['rank_sum']     = rank_df[ranks].sum(axis=1)
+    rank_df['overall_rank'] = rank_df['rank_sum'].rank(method='min')
     return rank_df
 
 #########################
@@ -189,18 +181,14 @@ if not uploaded_file:
     st.write("Please upload a CSV file to proceed.")
     st.stop()
 
-# 1) Load & clean once
 data = load_and_clean(uploaded_file)
 st.write("### Uploaded Data (Preview)")
 st.write(data.head())
 
 st.write("Select how many leading columns are metadata (non-numeric).")
 metadata_cols = st.number_input(
-    "Metadata columns",
-    min_value=0,
-    max_value=len(data.columns)-1,
-    value=2,
-    step=1
+    "Metadata columns", min_value=0,
+    max_value=len(data.columns)-1, value=2, step=1
 )
 numeric_columns = list(data.columns[metadata_cols:])
 
@@ -299,18 +287,13 @@ if st.button("Process Data"):
     st.write("### Processed Data Preview")
     st.dataframe(processed.head())
 
-    # distribution before vs after
     sel_var = st.selectbox("Variable to plot", numeric_columns)
     orig    = original_imputed(data, numeric_columns)
     fig, axes = plt.subplots(1,2,figsize=(12,5))
-    axes[0].hist(orig[sel_var].dropna(), bins=30)
-    axes[0].set_title(f"{sel_var} Before")
-    axes[1].hist(processed[sel_var].dropna(), bins=30)
-    axes[1].set_title(f"{sel_var} After")
-    st.pyplot(fig)
-    plt.close(fig)
+    axes[0].hist(orig[sel_var].dropna(), bins=30); axes[0].set_title(f"{sel_var} Before")
+    axes[1].hist(processed[sel_var].dropna(), bins=30); axes[1].set_title(f"{sel_var} After")
+    st.pyplot(fig); plt.close(fig)
 
-    # Heatmaps
     heat = st.selectbox(
         "Heatmap Type",
         ["Data Matrix","Correlation Heatmap","Clustered Heatmap"]
@@ -319,34 +302,26 @@ if st.button("Process Data"):
         fig, ax = plt.subplots(figsize=(10,6))
         mat = processed[numeric_columns].dropna(axis=1,how='all')
         cax = ax.imshow(mat, aspect='auto', cmap='viridis')
-        fig.colorbar(cax, ax=ax)
-        ax.set_title("Data Matrix Heatmap")
+        fig.colorbar(cax, ax=ax); ax.set_title("Data Matrix Heatmap")
         st.pyplot(fig); plt.close(fig)
     elif heat == "Correlation Heatmap":
         corr = processed[numeric_columns].corr()
         fig, ax = plt.subplots(figsize=(10,6))
-        sns.heatmap(corr, ax=ax, cmap='vlag', center=0,
-                    annot=(len(corr)<=15))
-        ax.set_title("Correlation Heatmap")
-        st.pyplot(fig); plt.close(fig)
+        sns.heatmap(corr, ax=ax, cmap='vlag', center=0, annot=(len(corr)<=15))
+        ax.set_title("Correlation Heatmap"); st.pyplot(fig); plt.close(fig)
     else:
         mat = processed[numeric_columns].dropna(axis=1,how='all')
         g = sns.clustermap(mat, cmap='viridis', figsize=(10,8))
-        plt.title("Clustered Heatmap")
-        st.pyplot(g.fig); plt.close(g.fig)
+        plt.title("Clustered Heatmap"); st.pyplot(g.fig); plt.close(g.fig)
 
-    # Boxplots
     st.write("#### Boxplots Before & After")
     orig = original_imputed(data, numeric_columns)
     cols = random.sample(numeric_columns, min(10, len(numeric_columns)))
     fig, axes = plt.subplots(2,1,figsize=(12,8))
-    sns.boxplot(data=orig[cols],   ax=axes[0])
-    axes[0].set_title("Before"); axes[0].tick_params(axis='x', rotation=90)
-    sns.boxplot(data=processed[cols], ax=axes[1])
-    axes[1].set_title("After");  axes[1].tick_params(axis='x', rotation=90)
+    sns.boxplot(data=orig[cols], ax=axes[0]); axes[0].set_title("Before"); axes[0].tick_params(axis='x', rotation=90)
+    sns.boxplot(data=processed[cols], ax=axes[1]); axes[1].set_title("After"); axes[1].tick_params(axis='x', rotation=90)
     st.pyplot(fig); plt.close(fig)
 
-    # Density Plots
     st.write("#### Density Plots Before & After")
     orig = original_imputed(data, numeric_columns)
     fig, axes = plt.subplots(2,1,figsize=(12,8))
@@ -356,7 +331,6 @@ if st.button("Process Data"):
     all_b = pd.concat([orig[c].dropna() for c in cols])
     sns.kdeplot(all_b, ax=axes[0], linewidth=3, label="Overall", fill=False)
     axes[0].legend()
-
     for col in cols:
         sns.kdeplot(processed[col].dropna(), ax=axes[1], fill=True, label=col)
     axes[1].set_title("After")
@@ -366,10 +340,13 @@ if st.button("Process Data"):
     st.pyplot(fig); plt.close(fig)
 
     # ----------------------------------------------------------
-    # Download with dynamic filename
+    # Download with dynamic filename including norm/log/scale
     # ----------------------------------------------------------
-    norm_tag = "noNorm" if norm_method == "None" else sanitize_label(norm_method)
-    file_name = f"processed_nmr_data_{norm_tag}.csv"
+    norm_tag  = "noNorm" if norm_method == "None" else sanitize_label(norm_method)
+    log_tag   = "log"    if log_method    else "noLog"
+    scale_tag = "noScale" if scale_choice == "None" else sanitize_label(scale_choice)
+    file_name = f"processed_nmr_data_{norm_tag}_{log_tag}_{scale_tag}.csv"
+
     csv = processed.to_csv(index=False)
     st.download_button(
         label="Download Processed CSV",
