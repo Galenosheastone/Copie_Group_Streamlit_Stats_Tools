@@ -202,6 +202,14 @@ if run and upload:
         "Sig": Sig,
         "flags": flags,
         "shap_df": shap_df,
+        "groups": m["Group"].cat.categories,
+        "test_key": test_key
+    
+        "analysis_ready": True,
+        "m": m,
+        "Sig": Sig,
+        "flags": flags,
+        "shap_df": shap_df,
         "groups": m["Group"].cat.categories
     })
 
@@ -216,7 +224,9 @@ flags   = st.session_state["flags"]
 shap_df = st.session_state["shap_df"]
 groups  = st.session_state["groups"]
 
-# Determine annotation label\anntation_name = "ttest_ind" if test_key != "MW" else "Mann-Whitney"
+# Retrieve test key for annotations
+test_key = st.session_state["test_key"]
+annotation_name = "ttest_ind" if test_key != "MW" else "Mann-Whitney"
 
 # Colour pickers
 default_palette = ['#0d2c6c', '#febe10', '#db4437', '#009688', '#8e24aa']
