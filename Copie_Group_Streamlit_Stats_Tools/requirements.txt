@@ -9,5 +9,9 @@ scikit-learn
 streamlit>=1.34.0
 statannotations
 statsmodels
-umap
-sklearn
+scikit-learn>=1.4,<1.5
+xgboost>=2.0.0
+shap>=0.46
+umap-learn>=0.5.5
+numba>=0.59,<0.60          # works with NumPy ≤2.1
+kaleido>=0.2.1             # optional – enables static PNG export of Plotly figs
