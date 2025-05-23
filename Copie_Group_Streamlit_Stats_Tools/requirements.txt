@@ -9,3 +9,4 @@ scikit-learn
 streamlit>=1.34.0
 statannotations
 statsmodels
+umap
