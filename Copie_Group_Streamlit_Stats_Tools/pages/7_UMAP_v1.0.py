@@ -8,8 +8,8 @@ Created 2025-05-23  — refactored from the original stand-alone script.
 Author: Galen O’Shea-Stone (adapted by ChatGPT)
 """
 
-# ────────────────────────────────────────── Imports ─────────────────────────────────────────
-import os, io, json, time, warnings
+import os
+import io
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -18,15 +18,13 @@ import matplotlib.colors as mcolors
 from matplotlib.patches import Ellipse
 from matplotlib import transforms
 from mpl_toolkits.mplot3d import Axes3D                       # noqa: F401 – needed for 3-D
+
 import umap
-# ───────── sklearn imports ─────────
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import silhouette_score, silhouette_samples
 from sklearn.manifold import trustworthiness
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
-
-
 from xgboost import XGBClassifier
 import shap
 import plotly.graph_objects as go
@@ -58,15 +56,12 @@ OUTPUT_DIRS = {
 for d in OUTPUT_DIRS.values():
     os.makedirs(d, exist_ok=True)
 
-
 def save_dataframe_csv(df: pd.DataFrame, fname: str) -> None:
     path = os.path.join(OUTPUT_DIRS["csv_files"], fname)
     df.to_csv(path, index=False)
 
-
 def download_button(label: str, data: bytes, fname: str, mime="text/csv"):
     st.download_button(label, data, file_name=fname, mime=mime)
-
 
 # ────────────────────────────────────────── 1. Load & cache data ────────────────────────────
 @st.cache_data(show_spinner="Loading data …")
@@ -74,7 +69,6 @@ def load_data(uploaded_file) -> pd.DataFrame:
     if uploaded_file is None:
         st.stop()
     return pd.read_csv(uploaded_file)
-
 
 uploaded = st.file_uploader("📄 Choose CSV file", type=["csv"])
 df = load_data(uploaded) if uploaded else None
@@ -113,20 +107,17 @@ def compute_umap(X_arr: np.ndarray, dims: int, rs: int) -> np.ndarray:
         random_state=rs
     ).fit_transform(X_arr)
 
-
 @st.cache_resource(show_spinner="Training XGBoost …")
 def train_xgb(X_arr: np.ndarray, y_arr: np.ndarray, ntree: int, rs: int):
     model = XGBClassifier(n_estimators=ntree, random_state=rs)
     model.fit(X_arr, y_arr)
     return model
 
-
 @st.cache_data(show_spinner="Calculating SHAP values …", hash_funcs={XGBClassifier: id})
 def shap_values(model: XGBClassifier, X_df: pd.DataFrame):
     explainer = shap.TreeExplainer(model)
     values = explainer.shap_values(X_df)
     return explainer, values
-
 
 # ────────────────────────────────────────── 4. Compute embeddings ───────────────────────────
 scaler = StandardScaler()
@@ -158,7 +149,6 @@ def confidence_ellipse(x, y, ax, n_std=1.96, **kw):
     ell.set_transform(transf + ax.transData)
     ax.add_patch(ell)
 
-
 def plot_umap2d(df2d: pd.DataFrame) -> plt.Figure:
     fig, ax = plt.subplots(figsize=(7, 5))
     for g in groups:
@@ -170,7 +160,6 @@ def plot_umap2d(df2d: pd.DataFrame) -> plt.Figure:
     ax.set_xlabel("UMAP1"); ax.set_ylabel("UMAP2"); ax.set_title("UMAP (2-D)")
     ax.legend(title="Group"); ax.grid(True)
     return fig
-
 
 fig2d = plot_umap2d(emb2d)
 st.pyplot(fig2d)
@@ -185,8 +174,10 @@ for g in groups:
         mode="markers", name=g,
         marker=dict(size=4, color=color_map[g], opacity=.75)
     ))
-fig3d.update_layout(scene=dict(xaxis_title="UMAP1", yaxis_title="UMAP2", zaxis_title="UMAP3"),
-                    width=900, height=700, title="Interactive 3-D UMAP")
+fig3d.update_layout(
+    scene=dict(xaxis_title="UMAP1", yaxis_title="UMAP2", zaxis_title="UMAP3"),
+    width=900, height=700, title="Interactive 3-D UMAP"
+)
 st.plotly_chart(fig3d, use_container_width=True)
 fig3d.write_html(os.path.join(OUTPUT_DIRS["umap_plots"], "umap_3d_interactive.html"))
 if KALEIDO_OK:
@@ -208,21 +199,26 @@ model = train_xgb(X_scaled, y_enc, n_estimators, random_state)
 
 if do_shap:
     explainer, shap_vals = shap_values(model, X)
-    shap_abs = np.abs(shap_vals[0] if isinstance(shap_vals, list) else shap_vals)
-    mean_abs = shap_abs.mean(axis=0)
-    top_feat = X.columns[np.argmax(mean_abs)]
+    # --- robust 1-D reduction of SHAP values ----------------------
+    if isinstance(shap_vals, list):
+        shap_abs = np.stack([np.abs(v) for v in shap_vals])    # (C, N, F)
+        mean_abs = shap_abs.mean(axis=(0, 1))                  # → (F,)
+    else:
+        shap_abs = np.abs(shap_vals)                            # (N, F)
+        mean_abs = shap_abs.mean(axis=0)                        # → (F,)
+
+    imp_df = pd.DataFrame({"Feature": X.columns, "Mean|SHAP|": mean_abs})
+    imp_top = imp_df.sort_values("Mean|SHAP|", ascending=False).head(20)
+
     st.subheader("🔎 SHAP Feature Importance (top 20)")
     fig_bar, ax_bar = plt.subplots(figsize=(5, 4))
-    imp_df = pd.DataFrame({"Feature": X.columns, "Mean|SHAP|": mean_abs})
-    imp_df.sort_values("Mean|SHAP|", ascending=False).head(20).plot.barh(
-        x="Feature", y="Mean|SHAP|", ax=ax_bar, legend=False)
+    imp_top.plot.barh(x="Feature", y="Mean|SHAP|", ax=ax_bar, legend=False)
     ax_bar.invert_yaxis(); ax_bar.set_xlabel("Mean(|SHAP|)")
     st.pyplot(fig_bar)
     fig_bar.savefig(os.path.join(OUTPUT_DIRS["shap_plots"], "shap_bar.png"), dpi=600)
 
-    # Optional SHAP summary beeswarm
     with st.expander("Full SHAP beeswarm"):
-        shap_fig = shap.summary_plot(shap_vals, X, feature_names=X.columns, show=False)
+        shap.summary_plot(shap_vals, X, feature_names=X.columns, show=False)
         st.pyplot(bbox_inches="tight")
         plt.savefig(os.path.join(OUTPUT_DIRS["shap_plots"], "shap_beeswarm.png"), dpi=600)
         plt.close()
@@ -237,14 +233,13 @@ X_tr, X_te, y_tr, y_te = train_test_split(
 )
 clf = train_xgb(X_tr, y_tr, n_estimators, random_state)
 y_pred = clf.predict(X_te)
+
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 acc = accuracy_score(y_te, y_pred)
 cm = confusion_matrix(y_te, y_pred)
 cr = classification_report(y_te, y_pred, output_dict=True)
 
-# ── Combined figure (mirrors original layout) ──
 fig_val, axs = plt.subplots(2, 2, figsize=(14, 12))
-
 # (0,0) table
 metrics_tbl = [
     ["Trustworthiness (2-D)", f"{trust2d:.3f}"],
@@ -253,8 +248,7 @@ metrics_tbl = [
     ["XGBoost Accuracy", f"{acc:.3f}"]
 ]
 axs[0, 0].axis('off')
-axs[0, 0].table(cellText=metrics_tbl, colLabels=["Metric", "Value"],
-                loc='center').auto_set_font_size(False)
+axs[0, 0].table(cellText=metrics_tbl, colLabels=["Metric", "Value"], loc='center').auto_set_font_size(False)
 
 # (0,1) Confusion matrix
 sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=axs[0, 1])
@@ -293,7 +287,15 @@ fig_val.savefig(os.path.join(OUTPUT_DIRS["validation_plots"], "validation_metric
 save_dataframe_csv(emb2d, "umap_embedding_2d.csv")
 save_dataframe_csv(emb3d, "umap_embedding_3d.csv")
 save_dataframe_csv(pd.DataFrame(cm), "confusion_matrix.csv")
-save_dataframe_csv(pd.DataFrame(cr).transpose(), "classification_report.csv")
+
+# Cleanly normalize the classification-report into a table
+cr_df = (
+    pd.json_normalize(cr, sep="_")  # flatten nested dict
+      .T                            # transpose
+      .rename_axis("class")        # nice index name
+      .reset_index()
+)
+save_dataframe_csv(cr_df, "classification_report.csv")
 
 st.success("✅ Analysis complete! Outputs saved in /plots and /csv.")
 
@@ -301,7 +303,6 @@ with st.expander("⬇️ Download key files"):
     download_button("UMAP 2-D CSV", emb2d.to_csv(index=False).encode(), "umap_embedding_2d.csv")
     download_button("UMAP 3-D CSV", emb3d.to_csv(index=False).encode(), "umap_embedding_3d.csv")
     download_button("Confusion matrix CSV", pd.DataFrame(cm).to_csv(index=False).encode(), "confusion_matrix.csv")
-    download_button("Classification report CSV",
-                    pd.DataFrame(cr).transpose().to_csv().encode(), "classification_report.csv")
+    download_button("Classification report CSV", cr_df.to_csv(index=False).encode(), "classification_report.csv")
 
-st.caption("© 2025 Galen O’Shea-Stone — script refactor by ChatGPT • Streamlit ≥ 1.33  |  Python ≥ 3.9")
+st.caption("© 2025 Galen O’Shea-Stone — script refactor by ChatGPT • Streamlit ≥ 1.33 | Python ≥ 3.9")
