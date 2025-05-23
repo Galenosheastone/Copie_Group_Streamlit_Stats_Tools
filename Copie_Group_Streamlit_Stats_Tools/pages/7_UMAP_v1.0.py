@@ -19,10 +19,13 @@ from matplotlib.patches import Ellipse
 from matplotlib import transforms
 from mpl_toolkits.mplot3d import Axes3D                       # noqa: F401 – needed for 3-D
 import umap
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.metrics import silhouette_score, silhouette_samples, trustworthiness
+
+# ───────── sklearn imports ─────────
+from sklearn.metrics import silhouette_score, silhouette_samples
+from sklearn.manifold import trustworthiness          # <-- fixed line
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
+
 from xgboost import XGBClassifier
 import shap
 import plotly.graph_objects as go
