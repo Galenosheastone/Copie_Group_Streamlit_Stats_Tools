@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-2_UMAP_Streamlit.py (robust-fix 2025-05-27, v1.3)
+2_UMAP_Streamlit.py (robust-fix 2025-05-27, v1.4)
 Streamlit wrapper for the “UMAP Metabolomics Analysis” pipeline.
 
 Fix history
@@ -10,6 +10,7 @@ Fix history
 🛠 v1.1   – SHAP beeswarm try/except with violin fallback
 🔄 v1.2   – defensive Top-features dict/list fallback
 🎯 v1.3   – convert all arrays to Python lists before DataFrame construction
+⚙️ v1.4   – corrected indentation in validation silhouette plotting loop
 
 Created 2025-05-23  — refactored by ChatGPT
 Author: Galen O’Shea-Stone
@@ -82,10 +83,10 @@ groups = y.unique().tolist()
 with st.sidebar:
     st.header("Parameters")
     random_state = st.number_input("Random seed", 0, 9999, 42)
-    n_neighbors = st.slider("UMAP n_neighbors", 5, 100, 15)
-    min_dist = st.slider("UMAP min_dist", 0.0, 1.0, 0.1)
-    n_trees = st.slider("XGBoost trees", 100, 1000, 500)
-    do_shap = st.checkbox("Compute SHAP analysis", True)
+    n_neighbors  = st.slider("UMAP n_neighbors", 5, 100, 15)
+    min_dist      = st.slider("UMAP min_dist", 0.0, 1.0, 0.1)
+    n_trees       = st.slider("XGBoost trees", 100, 1000, 500)
+    do_shap       = st.checkbox("Compute SHAP analysis", True)
     st.markdown("---")
     if st.button("Run analysis"): st.session_state["run"] = True
 if "run" not in st.session_state: st.stop()
@@ -93,128 +94,191 @@ if "run" not in st.session_state: st.stop()
 # ─────────────────────────── 3. Computations ───────────────────────────
 @st.cache_data(show_spinner="Embedding …")
 def compute_umap(data, dims, rs):
-    return umap.UMAP(n_components=dims, n_neighbors=n_neighbors,
-                     min_dist=min_dist, random_state=rs).fit_transform(data)
+    return umap.UMAP(
+        n_components=dims,
+        n_neighbors=n_neighbors,
+        min_dist=min_dist,
+        random_state=rs
+    ).fit_transform(data)
+
 @st.cache_resource(show_spinner="Training XGB …")
 def train_xgb(Xa, ya, nt, rs):
-    m = XGBClassifier(n_estimators=nt, random_state=rs); m.fit(Xa, ya); return m
+    m = XGBClassifier(n_estimators=nt, random_state=rs)
+    m.fit(Xa, ya)
+    return m
+
 @st.cache_data(hash_funcs={XGBClassifier: id}, show_spinner="SHAP …")
 def get_shap_vals(m, Xdf):
-    exp = shap.TreeExplainer(m); return exp, exp.shap_values(Xdf)
+    exp    = shap.TreeExplainer(m)
+    values = exp.shap_values(Xdf)
+    return exp, values
 
 # ─────────────────────────── 4. Embeddings ─────────────────────────────
-scaler = StandardScaler(); Xs = scaler.fit_transform(X.values)
-u2 = compute_umap(Xs, 2, random_state)
-emb2d = pd.DataFrame(u2, columns=["UMAP1","UMAP2"])
+scaler = StandardScaler()
+Xs     = scaler.fit_transform(X.values)
+u2     = compute_umap(Xs, 2, random_state)
+emb2d  = pd.DataFrame(u2, columns=["UMAP1","UMAP2"])
 emb2d[group_col] = y.values
-u3 = compute_umap(Xs, 3, random_state)
-emb3d = pd.DataFrame(u3, columns=["UMAP1","UMAP2","UMAP3"])
+u3     = compute_umap(Xs, 3, random_state)
+emb3d  = pd.DataFrame(u3, columns=["UMAP1","UMAP2","UMAP3"])
 emb3d[group_col] = y.values
 
 # ─────────────────────────── 5. Palette ───────────────────────────────
 cmap = plt.cm.get_cmap("tab10", len(groups))
-col_map = {g: mcolors.to_hex(cmap(i)) for i,g in enumerate(groups)}
+col_map = {g: mcolors.to_hex(cmap(i)) for i, g in enumerate(groups)}
 
 # ─────────────────────────── 6. 2D plot ───────────────────────────────
-def conf_ellipse(x,y,ax, n_std=1.96, **kw):
-    if len(x)==0: return
-    cov=np.cov(x,y); pear=cov[0,1]/np.sqrt(cov[0,0]*cov[1,1])
-    rx,ry=np.sqrt(1+pear),np.sqrt(1-pear)
-    ell=Ellipse((0,0),rx*2,ry*2,**kw)
-    Sx,Sy=np.sqrt(cov[0,0])*n_std,np.sqrt(cov[1,1])*n_std
-    T=transforms.Affine2D().rotate_deg(45).scale(Sx,Sy).translate(x.mean(),y.mean())
-    ell.set_transform(T+ax.transData); ax.add_patch(ell)
+def conf_ellipse(x, y, ax, n_std=1.96, **kw):
+    if len(x) == 0: return
+    cov = np.cov(x, y)
+    pear = cov[0,1] / np.sqrt(cov[0,0] * cov[1,1])
+    rx, ry = np.sqrt(1+pear), np.sqrt(1-pear)
+    ell = Ellipse((0,0), width=rx*2, height=ry*2, **kw)
+    Sx, Sy = np.sqrt(cov[0,0])*n_std, np.sqrt(cov[1,1])*n_std
+    T = transforms.Affine2D().rotate_deg(45).scale(Sx, Sy).translate(x.mean(), y.mean())
+    ell.set_transform(T + ax.transData)
+    ax.add_patch(ell)
 
-fig,ax=plt.subplots(figsize=(7,5))
+fig, ax = plt.subplots(figsize=(7,5))
 for g in groups:
-    sel=emb2d[emb2d[group_col]==g]
-    ax.scatter(sel["UMAP1"],sel["UMAP2"],label=g,color=col_map[g],alpha=.7,s=60)
-    conf_ellipse(sel["UMAP1"],sel["UMAP2"],ax,facecolor=col_map[g],alpha=.15,edgecolor='black')
-ax.set(xlabel="UMAP1",ylabel="UMAP2",title="UMAP (2D)"); ax.legend(); ax.grid()
-st.pyplot(fig); fig.savefig(os.path.join(OUTPUT_DIRS["umap_plots"],"umap_2d.png"),dpi=600)
+    sel = emb2d[emb2d[group_col] == g]
+    ax.scatter(sel["UMAP1"], sel["UMAP2"], label=g, color=col_map[g], alpha=.7, s=60)
+    conf_ellipse(sel["UMAP1"], sel["UMAP2"], ax, facecolor=col_map[g], alpha=.15, edgecolor='black')
+ax.set(xlabel="UMAP1", ylabel="UMAP2", title="UMAP (2D)")
+ax.legend(); ax.grid()
+st.pyplot(fig)
+fig.savefig(os.path.join(OUTPUT_DIRS["umap_plots"], "umap_2d.png"), dpi=600)
 
 # ─────────────────────────── 7. 3D plot ───────────────────────────────
 fig3 = go.Figure()
 for g in groups:
-    sel=emb3d[emb3d[group_col]==g]
-    fig3.add_trace(go.Scatter3d(x=sel["UMAP1"].tolist(),y=sel["UMAP2"].tolist(),
-        z=sel["UMAP3"].tolist(),mode="markers",name=g,
-        marker=dict(size=4,color=col_map[g],opacity=.75)))
-fig3.update_layout(scene=dict(xaxis_title="UMAP1",yaxis_title="UMAP2",zaxis_title="UMAP3"),
-                   width=900,height=700,title="UMAP 3D")
-st.plotly_chart(fig3,use_container_width=True)
-fig3.write_html(os.path.join(OUTPUT_DIRS["umap_plots"],"umap_3d.html"))
-if KALEIDO_OK: fig3.write_image(os.path.join(OUTPUT_DIRS["umap_plots"],"umap_3d.png"))
+    sel = emb3d[emb3d[group_col] == g]
+    fig3.add_trace(
+        go.Scatter3d(
+            x=sel["UMAP1"].tolist(),
+            y=sel["UMAP2"].tolist(),
+            z=sel["UMAP3"].tolist(),
+            mode="markers", name=g,
+            marker=dict(size=4, color=col_map[g], opacity=.75)
+        )
+    )
+fig3.update_layout(
+    scene=dict(xaxis_title="UMAP1", yaxis_title="UMAP2", zaxis_title="UMAP3"),
+    width=900, height=700, title="UMAP 3D"
+)
+st.plotly_chart(fig3, use_container_width=True)
+fig3.write_html(os.path.join(OUTPUT_DIRS["umap_plots"], "umap_3d.html"))
+if KALEIDO_OK:
+    fig3.write_image(os.path.join(OUTPUT_DIRS["umap_plots"], "umap_3d.png"))
 
 # ─────────────────────────── 8. Top features ──────────────────────────
-corr = np.corrcoef(Xs.T, u2.T)[:Xs.shape[1],Xs.shape[1]:]
+corr   = np.corrcoef(Xs.T, u2.T)[:Xs.shape[1], Xs.shape[1]:]
 scores = np.abs(corr).sum(1)
-idx = np.argsort(scores)[-15:]
-rows = list(zip(list(X.columns[idx]), list(scores[idx])))
-df_top = pd.DataFrame(rows, columns=["Feature","AbsCorrSum"]).sort_values("AbsCorrSum",ascending=False)
+idx    = np.argsort(scores)[-15:]
+rows   = list(zip(X.columns[idx].tolist(), scores[idx].tolist()))
+df_top = pd.DataFrame(rows, columns=["Feature","AbsCorrSum"]).sort_values("AbsCorrSum", ascending=False)
 with st.expander("📈 Top features correlated with UMAP axes"):
     st.write(df_top)
 
 # ─────────────────────────── 9. XGB & SHAP ────────────────────────────
-model = train_xgb(Xs,y_enc,n_trees,random_state)
+model = train_xgb(Xs, y_enc, n_trees, random_state)
 if do_shap:
-    exp,vals = get_shap_vals(model, pd.DataFrame(X.values,columns=X.columns))
-    if isinstance(vals,list): arr=np.mean(np.abs(vals),axis=0)
-    else: arr=vals
-    bar_df=pd.DataFrame({"Feature":X.columns.tolist(),"Mean|SHAP|":np.abs(arr).mean(0).tolist()})
-    imp=bar_df.sort_values("Mean|SHAP|",ascending=False).head(20)
+    exp, vals = get_shap_vals(model, pd.DataFrame(X.values, columns=X.columns))
+    if isinstance(vals, list):
+        arr = np.mean(np.abs(vals), axis=0)
+    else:
+        arr = vals
+    mean_abs = np.abs(arr).mean(axis=0)
+    bar_df   = pd.DataFrame({"Feature":X.columns.tolist(), "Mean|SHAP|": mean_abs.tolist()})
+    imp      = bar_df.sort_values("Mean|SHAP|", ascending=False).head(20)
     st.subheader("🔎 SHAP Importance")
-    figb,axb=plt.subplots(figsize=(6,5))
-    imp.plot.barh(x="Feature",y="Mean|SHAP|",ax=axb,legend=False)
+    figb, axb = plt.subplots(figsize=(6,5))
+    imp.plot.barh(x="Feature", y="Mean|SHAP|", ax=axb, legend=False)
     axb.invert_yaxis(); axb.set_xlabel("Mean(|SHAP|)")
-    st.pyplot(figb); figb.savefig(os.path.join(OUTPUT_DIRS["shap_plots"],"shap_bar.png"),dpi=600)
+    st.pyplot(figb)
+    figb.savefig(os.path.join(OUTPUT_DIRS["shap_plots"], "shap_bar.png"), dpi=600)
+
     with st.expander("SHAP beeswarm"):
         try:
             shap.summary_plot(arr, X, feature_names=X.columns, show=False)
-            st.pyplot(bbox_inches="tight")
-            plt.savefig(os.path.join(OUTPUT_DIRS["shap_plots"],"shap_beeswarm.png"),dpi=600)
+            st.pyplot(bbox__inches="tight")
+            plt.savefig(os.path.join(OUTPUT_DIRS["shap_plots"], "shap_beeswarm.png"), dpi=600)
         except Exception as e:
             st.warning(f"SHAP beeswarm failed: {e}")
             dv = {c: arr[:,i].tolist() for i,c in enumerate(X.columns)}
-            fgv,axv=plt.subplots(figsize=(6,5))
-            sns.violinplot(data=pd.DataFrame(dv),inner="quartile",ax=axv)
-            axv.set_xticklabels(X.columns,rotation=90)
+            fgv, axv = plt.subplots(figsize=(6,5))
+            sns.violinplot(data=pd.DataFrame(dv), inner="quartile", ax=axv)
+            axv.set_xticklabels(X.columns, rotation=90)
             plt.tight_layout(); st.pyplot(fgv)
-            fgv.savefig(os.path.join(OUTPUT_DIRS["shap_plots"],"shap_violin.png"),dpi=600)
+            fgv.savefig(os.path.join(OUTPUT_DIRS["shap_plots"], "shap_violin.png"), dpi=600)
 
 # ────────────────────────── 10. Validation ─────────────────────────────
-trust2 = trustworthiness(Xs,u2,n_neighbors=5)
-trust3 = trustworthiness(Xs,u3,n_neighbors=5)
-sil = silhouette_score(u2,y_enc)
-Xtr,Xte,ytr,yte = train_test_split(Xs,y_enc,stratify=y_enc,test_size=.2,random_state=random_state)
-clf=train_xgb(Xtr,ytr,n_trees,random_state); yp=clf.predict(Xte)
-from sklearn.metrics import accuracy_score,confusion_matrix,classification_report
-acc=accuracy_score(yte,yp); cm=confusion_matrix(yte,yp); cr=classification_report(yte,yp,output_dict=True)
-# table + plots
-figv,axs=plt.subplots(2,2,figsize=(14,12))
-tbl=[["Trust 2D",f"{trust2:.3f}"],["Trust 3D",f"{trust3:.3f}"],["Silhouette",f"{sil:.3f}"],["XGB Acc",f"{acc:.3f}"]]
-axs[0,0].axis('off'); axs[0,0].table(cellText=tbl,colLabels=["Metric","Value"],loc='center').auto_set_font_size(False)
-sns.heatmap(cm,annot=True,fmt='d',cmap='Blues',ax=axs[0,1]); axs[0,1].set(title='Confusion Matrix',xlabel='Pred',ylabel='Actual')
-samp=silhouette_samples(u2,y_enc); y0=10
-for i in np.unique(y_enc): arr2=samp[y_enc==i]; arr2.sort(); y1=y0+len(arr2);
-    axs[1,0].fill_betweenx(np.arange(y0,y1),0,arr2,facecolor=plt.cm.nipy_spectral(i/len(groups)),alpha=.7)
-    axs[1,0].text(-0.05,y0+len(arr2)/2,str(i)); y0=y1+10
-axs[1,0].axvline(sil,color='red',ls='--'); axs[1,0].set(title='Silhouette (2D)',xlabel='Coeff',yticks=[])
-cls=[c for c in cr if c.isdigit()]; p=[cr[c]['precision'] for c in cls]; r=[cr[c]['recall'] for c in cls]; f=[cr[c]['f1-score'] for c in cls]
-x=np.arange(len(cls)); w=.25
-axs[1,1].bar(x-w,p,w,label='Prec'); axs[1,1].bar(x,r,w,label='Rec'); axs[1,1].bar(x+w,f,w,label='F1')
-axs[1,1].set_xticks(x); axs[1,1].set_xticklabels(cls); axs[1,1].set_ylim(0,1); axs[1,1].legend(); axs[1,1].set(title='Per-class')
-plt.tight_layout(); st.pyplot(figv); figv.savefig(os.path.join(OUTPUT_DIRS["validation_plots"],"val.png"),dpi=600)
-# CSVs
+trust2 = trustworthiness(Xs, u2, n_neighbors=5)
+trust3 = trustworthiness(Xs, u3, n_neighbors=5)
+sil    = silhouette_score(u2, y_enc)
+Xtr, Xte, ytr, yte = train_test_split(Xs, y_enc, stratify=y_enc, test_size=0.2, random_state=random_state)
+clf  = train_xgb(Xtr, ytr, n_trees, random_state)
+yp   = clf.predict(Xte)
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+acc  = accuracy_score(yte, yp)
+cm   = confusion_matrix(yte, yp)
+cr   = classification_report(yte, yp, output_dict=True)
+
+figv, axs = plt.subplots(2,2,figsize=(14,12))
+# metrics table
+metrics = [
+    ["Trust 2D", f"{trust2:.3f}"],
+    ["Trust 3D", f"{trust3:.3f}"],
+    ["Silhouette", f"{sil:.3f}"],
+    ["XGB Acc", f"{acc:.3f}"]
+]
+axs[0,0].axis('off')
+tbl = axs[0,0].table(cellText=metrics, colLabels=["Metric","Value"], loc='center')
+tbl.auto_set_font_size(False)
+# confusion
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=axs[0,1])
+axs[0,1].set(title='Confusion Matrix', xlabel='Predicted', ylabel='Actual')
+# silhouette distribution
+samp = silhouette_samples(u2, y_enc)
+y0   = 10
+for i in np.unique(y_enc):
+    arr2 = samp[y_enc == i]
+    arr2.sort()
+    y1   = y0 + len(arr2)
+    color = plt.cm.nipy_spectral(float(i) / len(groups))
+    axs[1,0].fill_betweenx(np.arange(y0, y1), 0, arr2, facecolor=color, alpha=0.7)
+    axs[1,0].text(-0.05, y0 + 0.5 * len(arr2), str(i))
+    y0 = y1 + 10
+axs[1,0].axvline(sil, color='red', ls='--')
+axs[1,0].set(title='Silhouette (2D)', xlabel='Coefficient', yticks=[])
+# per-class metrics
+classes = [c for c in cr if c.isdigit()]
+prec = [cr[c]['precision'] for c in classes]
+rec  = [cr[c]['recall']    for c in classes]
+f1s  = [cr[c]['f1-score']  for c in classes]
+x    = np.arange(len(classes)); w=0.25
+axs[1,1].bar(x - w, prec, w, label='Precision')
+axs[1,1].bar(x    , rec , w, label='Recall')
+axs[1,1].bar(x + w, f1s, w, label='F1')
+axs[1,1].set_xticks(x); axs[1,1].set_xticklabels(classes)
+axs[1,1].set_ylim(0,1); axs[1,1].legend(); axs[1,1].set(title='Per-class')
+
+plt.tight_layout()
+st.pyplot(figv)
+figv.savefig(os.path.join(OUTPUT_DIRS["validation_plots"], "validation_metrics.png"), dpi=600)
+
+# ────────────────────────── 11. CSV exports ─────────────────────────────
 save_dataframe_csv(emb2d, "umap_embedding_2d.csv")
 save_dataframe_csv(emb3d, "umap_embedding_3d.csv")
-save_dataframe_csv(pd.DataFrame(cm.tolist()),"confusion_matrix.csv")
-crdf=pd.json_normalize(cr,sep="_").T.rename_axis("class").reset_index()
-save_dataframe_csv(crdf,"classification_report.csv")
+save_dataframe_csv(pd.DataFrame(cm.tolist()), "confusion_matrix.csv")
+crdf = pd.json_normalize(cr, sep="_").T.rename_axis("class").reset_index()
+save_dataframe_csv(crdf, "classification_report.csv")
 st.success("✅ All done — plots and CSVs saved.")
+
 with st.expander("⬇️ Download files"):
-    download_button("UMAP 2D", emb2d.to_csv(index=False).encode(),"umap_2d.csv")
-    download_button("UMAP 3D", emb3d.to_csv(index=False).encode(),"umap_3d.csv")
-    download_button("Conf Matrix", pd.DataFrame(cm.tolist()).to_csv(index=False).encode(),"conf_matrix.csv")
-    download_button("Class Report", crdf.to_csv(index=False).encode(),"class_report.csv")
+    download_button("UMAP 2D", emb2d.to_csv(index=False).encode(), "umap_2d.csv")
+    download_button("UMAP 3D", emb3d.to_csv(index=False).encode(), "umap_3d.csv")
+    download_button("Conf Matrix", pd.DataFrame(cm.tolist()).to_csv(index=False).encode(), "conf_matrix.csv")
+    download_button("Class Report", crdf.to_csv(index=False).encode(), "class_report.csv")
+
 st.caption("© 2025 Galen O’Shea-Stone")
