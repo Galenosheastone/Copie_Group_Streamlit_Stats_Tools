@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-2_UMAP_Streamlit.py (robust-fix 2025-05-27, v1.4)
+2_UMAP_Streamlit.py (robust-fix 2025-05-27, v1.5)
 Streamlit wrapper for the “UMAP Metabolomics Analysis” pipeline.
 
 Fix history
@@ -10,7 +10,9 @@ Fix history
 🛠 v1.1   – SHAP beeswarm try/except with violin fallback
 🔄 v1.2   – defensive Top-features dict/list fallback
 🎯 v1.3   – convert all arrays to Python lists before DataFrame construction
-⚙️ v1.4   – corrected indentation in validation silhouette plotting loop
+⚙️ v1.4   – corrected indentation in validation silhouette loop
+🔧 v1.5   – replace pandas plot.barh with matplotlib barh to avoid
+               "no numeric data to plot" errors
 
 Created 2025-05-23  — refactored by ChatGPT
 Author: Galen O’Shea-Stone
@@ -184,16 +186,15 @@ with st.expander("📈 Top features correlated with UMAP axes"):
 model = train_xgb(Xs, y_enc, n_trees, random_state)
 if do_shap:
     exp, vals = get_shap_vals(model, pd.DataFrame(X.values, columns=X.columns))
-    if isinstance(vals, list):
-        arr = np.mean(np.abs(vals), axis=0)
-    else:
-        arr = vals
+    if isinstance(vals, list): arr = np.mean(np.abs(vals), axis=0)
+    else: arr = vals
     mean_abs = np.abs(arr).mean(axis=0)
     bar_df   = pd.DataFrame({"Feature":X.columns.tolist(), "Mean|SHAP|": mean_abs.tolist()})
     imp      = bar_df.sort_values("Mean|SHAP|", ascending=False).head(20)
-    st.subheader("🔎 SHAP Importance")
+    st.subheader("🔎 SHAP Feature Importance (top 20)")
     figb, axb = plt.subplots(figsize=(6,5))
-    imp.plot.barh(x="Feature", y="Mean|SHAP|", ax=axb, legend=False)
+    # matplotlib barh instead of pandas plot
+    axb.barh(imp["Feature"].tolist(), imp["Mean|SHAP|"].tolist())
     axb.invert_yaxis(); axb.set_xlabel("Mean(|SHAP|)")
     st.pyplot(figb)
     figb.savefig(os.path.join(OUTPUT_DIRS["shap_plots"], "shap_bar.png"), dpi=600)
@@ -201,7 +202,7 @@ if do_shap:
     with st.expander("SHAP beeswarm"):
         try:
             shap.summary_plot(arr, X, feature_names=X.columns, show=False)
-            st.pyplot(bbox__inches="tight")
+            st.pyplot(bbox_inches="tight")
             plt.savefig(os.path.join(OUTPUT_DIRS["shap_plots"], "shap_beeswarm.png"), dpi=600)
         except Exception as e:
             st.warning(f"SHAP beeswarm failed: {e}")
@@ -217,68 +218,9 @@ trust2 = trustworthiness(Xs, u2, n_neighbors=5)
 trust3 = trustworthiness(Xs, u3, n_neighbors=5)
 sil    = silhouette_score(u2, y_enc)
 Xtr, Xte, ytr, yte = train_test_split(Xs, y_enc, stratify=y_enc, test_size=0.2, random_state=random_state)
-clf  = train_xgb(Xtr, ytr, n_trees, random_state)
-yp   = clf.predict(Xte)
+clf = train_xgb(Xtr, ytr, n_trees, random_state); yp = clf.predict(Xte)
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-acc  = accuracy_score(yte, yp)
-cm   = confusion_matrix(yte, yp)
-cr   = classification_report(yte, yp, output_dict=True)
+acc = accuracy_score(yte, yp); cm = confusion_matrix(yte, yp); cr = classification_report(yte, yp, output_dict=True)
 
 figv, axs = plt.subplots(2,2,figsize=(14,12))
-# metrics table
-metrics = [
-    ["Trust 2D", f"{trust2:.3f}"],
-    ["Trust 3D", f"{trust3:.3f}"],
-    ["Silhouette", f"{sil:.3f}"],
-    ["XGB Acc", f"{acc:.3f}"]
-]
-axs[0,0].axis('off')
-tbl = axs[0,0].table(cellText=metrics, colLabels=["Metric","Value"], loc='center')
-tbl.auto_set_font_size(False)
-# confusion
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=axs[0,1])
-axs[0,1].set(title='Confusion Matrix', xlabel='Predicted', ylabel='Actual')
-# silhouette distribution
-samp = silhouette_samples(u2, y_enc)
-y0   = 10
-for i in np.unique(y_enc):
-    arr2 = samp[y_enc == i]
-    arr2.sort()
-    y1   = y0 + len(arr2)
-    color = plt.cm.nipy_spectral(float(i) / len(groups))
-    axs[1,0].fill_betweenx(np.arange(y0, y1), 0, arr2, facecolor=color, alpha=0.7)
-    axs[1,0].text(-0.05, y0 + 0.5 * len(arr2), str(i))
-    y0 = y1 + 10
-axs[1,0].axvline(sil, color='red', ls='--')
-axs[1,0].set(title='Silhouette (2D)', xlabel='Coefficient', yticks=[])
-# per-class metrics
-classes = [c for c in cr if c.isdigit()]
-prec = [cr[c]['precision'] for c in classes]
-rec  = [cr[c]['recall']    for c in classes]
-f1s  = [cr[c]['f1-score']  for c in classes]
-x    = np.arange(len(classes)); w=0.25
-axs[1,1].bar(x - w, prec, w, label='Precision')
-axs[1,1].bar(x    , rec , w, label='Recall')
-axs[1,1].bar(x + w, f1s, w, label='F1')
-axs[1,1].set_xticks(x); axs[1,1].set_xticklabels(classes)
-axs[1,1].set_ylim(0,1); axs[1,1].legend(); axs[1,1].set(title='Per-class')
-
-plt.tight_layout()
-st.pyplot(figv)
-figv.savefig(os.path.join(OUTPUT_DIRS["validation_plots"], "validation_metrics.png"), dpi=600)
-
-# ────────────────────────── 11. CSV exports ─────────────────────────────
-save_dataframe_csv(emb2d, "umap_embedding_2d.csv")
-save_dataframe_csv(emb3d, "umap_embedding_3d.csv")
-save_dataframe_csv(pd.DataFrame(cm.tolist()), "confusion_matrix.csv")
-crdf = pd.json_normalize(cr, sep="_").T.rename_axis("class").reset_index()
-save_dataframe_csv(crdf, "classification_report.csv")
-st.success("✅ All done — plots and CSVs saved.")
-
-with st.expander("⬇️ Download files"):
-    download_button("UMAP 2D", emb2d.to_csv(index=False).encode(), "umap_2d.csv")
-    download_button("UMAP 3D", emb3d.to_csv(index=False).encode(), "umap_3d.csv")
-    download_button("Conf Matrix", pd.DataFrame(cm.tolist()).to_csv(index=False).encode(), "conf_matrix.csv")
-    download_button("Class Report", crdf.to_csv(index=False).encode(), "class_report.csv")
-
-st.caption("© 2025 Galen O’Shea-Stone")
+metrics = [["Trust 2D", f"{trust2:.3f}"],["Trust 3D", f"{trust3:.3f}"],["Silhouette", f"{sil:.3f}"],["XGB Acc", f"{acc:
