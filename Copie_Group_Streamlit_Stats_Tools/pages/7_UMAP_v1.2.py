@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-2_UMAP_Streamlit.py (robust-fix 2025-05-27, v1.1)
+2_UMAP_Streamlit.py (robust-fix 2025-05-27, v1.2)
 Streamlit wrapper for the “UMAP Metabolomics Analysis” pipeline.
 
 Fix history
 -----------
 ✅ v1   (May 27) – aggregated multi-class SHAP values to 2-D to avoid Pandas
                  “Per-column arrays must each be 1-dimensional” error.
-🛠 v1.1 (this) – wrap SHAP beeswarm in try/except and fall back to a violin plot
+🛠 v1.1 (May 27) – wrap SHAP beeswarm in try/except and fall back to a violin plot
                  if Pandas still rejects the data, so the page never crashes.
+🔄 v1.2 (May 27) – robustify Top-features table: catch dict-based DataFrame errors
+                 and fall back to list-of-rows construction.
+
+Created 2025-05-23  — refactored by ChatGPT
+Author: Galen O’Shea-Stone
 """
 
 import os
@@ -198,145 +203,83 @@ if KALEIDO_OK:
     fig3d.write_image(os.path.join(OUTPUT_DIRS["umap_plots"], "umap_3d_interactive.png"))
 
 # ───────────────────────────── 8. Feature–UMAP correlations ─────────────────
+# Try dict-based DataFrame, fallback to list-of-rows if it errors
 corr = np.corrcoef(X_scaled.T, umap2d.T)[: X_scaled.shape[1], X_scaled.shape[1]:]
 abs_sum = np.abs(corr).sum(1)
 top_idx = np.argsort(abs_sum)[-15:]
-
 with st.expander("📈 Top features correlated with UMAP axes"):
-    st.write(
-        pd.DataFrame({
+    try:
+        df_top = pd.DataFrame({
             "Feature": X.columns[top_idx],
             "AbsCorrSum": abs_sum[top_idx],
         }).sort_values("AbsCorrSum", ascending=False)
-    )
+    except ValueError:
+        # fallback: list-of-rows
+        rows = list(zip(X.columns[top_idx], abs_sum[top_idx]))
+        df_top = pd.DataFrame(rows, columns=["Feature", "AbsCorrSum"]).sort_values("AbsCorrSum", ascending=False)
+    st.write(df_top)
 
 # ───────────────────────────── 9. XGBoost & SHAP (robust) ───────────────────
 model = train_xgb(X_scaled, y_enc, n_estimators, random_state)
-
 if do_shap:
     explainer, shap_vals = get_shap_values(model, X)
-
-    # Aggregate to 2-D if multi-class
+    # aggregate multi-class
     if isinstance(shap_vals, list):
-        shap_beeswarm = np.mean(np.abs(shap_vals), axis=0)  # (N × F)
+        shap_beeswarm = np.mean(np.abs(shap_vals), axis=0)
     else:
-        shap_beeswarm = shap_vals                          # (N × F)
-
-    # Bar plot of top-20
+        shap_beeswarm = shap_vals
     mean_abs = np.abs(shap_beeswarm).mean(axis=0)
     imp_df = pd.DataFrame({"Feature": X.columns, "Mean|SHAP|": mean_abs})
     imp_top = imp_df.sort_values("Mean|SHAP|", ascending=False).head(20)
-
     st.subheader("🔎 SHAP Feature Importance (top 20)")
     fig_bar, ax_bar = plt.subplots(figsize=(6, 5))
     imp_top.plot.barh(x="Feature", y="Mean|SHAP|", ax=ax_bar, legend=False)
     ax_bar.invert_yaxis(); ax_bar.set_xlabel("Mean(|SHAP|)")
     st.pyplot(fig_bar)
-    fig_bar.savefig(os.path.join(OUTPUT_DIRS["shap_plots"], "shap_bar.png"), dpi=600)
-
-    # Beeswarm (with graceful fallback)
+    fig_bar.savefig(os.path.join(OUTPUT_DIRS["shap_plots"][0], "shap_bar.png"), dpi=600)
     with st.expander("Full SHAP beeswarm"):
         try:
             shap.summary_plot(shap_beeswarm, X, feature_names=X.columns, show=False)
             st.pyplot(bbox_inches="tight")
-            plt.savefig(os.path.join(OUTPUT_DIRS["shap_plots"], "shap_beeswarm.png"), dpi=600)
+            plt.savefig(os.path.join(OUTPUT_DIRS["shap_plots"][0], "shap_beeswarm.png"), dpi=600)
             plt.close()
         except Exception as e:
             st.warning(f"Unable to build SHAP beeswarm plot: {e}")
-            # fallback: violin summary
             fig_violin, ax_violin = plt.subplots(figsize=(6, 5))
-            sns.violinplot(
-                data=pd.DataFrame(shap_beeswarm, columns=X.columns),
-                inner="quartile",
-                ax=ax_violin
-            )
+            sns.violinplot(data=pd.DataFrame(shap_beeswarm, columns=X.columns), inner="quartile", ax=ax_violin)
             ax_violin.set_xticklabels(X.columns, rotation=90)
             plt.tight_layout()
             st.pyplot(fig_violin)
-            fig_violin.savefig(os.path.join(OUTPUT_DIRS["shap_plots"], "shap_violin.png"), dpi=600)
+            fig_violin.savefig(os.path.join(OUTPUT_DIRS["shap_plots"][0], "shap_violin.png"), dpi=600)
             plt.close()
 
 # ───────────────────────────── 10. Validation metrics ─────────────────────────
 trust2d = trustworthiness(X_scaled, umap2d, n_neighbors=5)
 trust3d = trustworthiness(X_scaled, umap3d, n_neighbors=5)
-sil     = silhouette_score(umap2d, y_enc)
-
-X_tr, X_te, y_tr, y_te = train_test_split(
-    X_scaled, y_enc, stratify=y_enc, test_size=0.2, random_state=random_state
-)
-clf    = train_xgb(X_tr, y_tr, n_estimators, random_state)
+sil = silhouette_score(umap2d, y_enc)
+X_tr, X_te, y_tr, y_te = train_test_split(X_scaled, y_enc, stratify=y_enc, test_size=0.2, random_state=random_state)
+clf = train_xgb(X_tr, y_tr, n_estimators, random_state)
 y_pred = clf.predict(X_te)
-
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-
 acc = accuracy_score(y_te, y_pred)
-cm  = confusion_matrix(y_te, y_pred)
-cr  = classification_report(y_te, y_pred, output_dict=True)
-
+cm = confusion_matrix(y_te, y_pred)
+cr = classification_report(y_te, y_pred, output_dict=True)
 fig_val, axs = plt.subplots(2, 2, figsize=(14, 12))
-
-# (0,0) metrics table
-metrics_tbl = [
-    ["Trustworthiness (2-D)", f"{trust2d:.3f}"],
-    ["Trustworthiness (3-D)", f"{trust3d:.3f}"],
-    ["Silhouette",            f"{sil:.3f}"],
-    ["XGBoost Accuracy",      f"{acc:.3f}"],
-]
-axs[0, 0].axis("off")
-axs[0, 0].table(cellText=metrics_tbl, colLabels=["Metric", "Value"], loc="center").auto_set_font_size(False)
-
-# (0,1) confusion matrix
-sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=axs[0, 1])
-axs[0, 1].set_title("Confusion Matrix"); axs[0, 1].set_xlabel("Predicted"); axs[0, 1].set_ylabel("Actual")
-
-# (1,0) silhouette plot
-sample_sil = silhouette_samples(umap2d, y_enc)
-y_low = 10
-for i in np.unique(y_enc):
-    ith = sample_sil[y_enc == i]; ith.sort()
-    y_up = y_low + len(ith)
-    color = plt.cm.nipy_spectral(float(i) / len(groups))
-    axs[1, 0].fill_betweenx(np.arange(y_low, y_up), 0, ith, facecolor=color, alpha=0.7)
-    axs[1, 0].text(-0.05, y_low + 0.5 * len(ith), str(i))
-    y_low = y_up + 10
-axs[1, 0].axvline(sil, color="red", ls="--")
-axs[1, 0].set_title("Silhouette (UMAP 2-D)"); axs[1, 0].set_xlabel("Silhouette coefficient"); axs[1, 0].set_yticks([])
-
-# (1,1) per-class precision/recall/F1
-classes = [c for c in cr if c.isdigit()]
-prec    = [cr[c]["precision"] for c in classes]
-rec     = [cr[c]["recall"]    for c in classes]
-f1s     = [cr[c]["f1-score"]  for c in classes]
-x = np.arange(len(classes)); w = 0.25
-axs[1, 1].bar(x - w, prec, w, label="Precision")
-axs[1, 1].bar(x,     rec,  w, label="Recall")
-axs[1, 1].bar(x + w, f1s,  w, label="F1")
-axs[1, 1].set_xticks(x); axs[1, 1].set_xticklabels(classes)
-axs[1, 1].set_ylim(0, 1); axs[1, 1].legend(); axs[1, 1].set_title("Per-class metrics")
-
-plt.tight_layout()
-st.pyplot(fig_val)
-fig_val.savefig(os.path.join(OUTPUT_DIRS["validation_plots"], "validation_metrics.png"), dpi=600)
-
-# ────────────────────────── 11. CSV exports & download links ─────────────────────
-save_dataframe_csv(emb2d, "umap_embedding_2d.csv")
-save_dataframe_csv(emb3d, "umap_embedding_3d.csv")
-save_dataframe_csv(pd.DataFrame(cm), "confusion_matrix.csv")
-
-cr_df = (
-    pd.json_normalize(cr, sep="_")
-      .T
-      .rename_axis("class")
-      .reset_index()
-)
-save_dataframe_csv(cr_df, "classification_report.csv")
-
+metrics_tbl = [["Trustworthiness (2-D)", f"{trust2d:.3f}"],["Trustworthiness (3-D)", f"{trust3d:.3f}"],["Silhouette", f"{sil:.3f}"],["XGBoost Accuracy", f"{acc:.3f}"]]
+axs[0,0].axis("off"); axs[0,0].table(cellText=metrics_tbl, colLabels=["Metric","Value"], loc="center").auto_set_font_size(False)
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=axs[0,1]); axs[0,1].set_title("Confusion Matrix"); axs[0,1].set_ylabel("Actual"); axs[0,1].set_xlabel("Predicted")
+sample_sil = silhouette_samples(umap2d, y_enc); y_low=10
+for i in np.unique(y_enc): ith=sample_sil[y_enc==i]; ith.sort(); y_up=y_low+len(ith); color=plt.cm.nipy_spectral(float(i)/len(groups)); axs[1,0].fill_betweenx(np.arange(y_low,y_up),0,ith,facecolor=color,alpha=0.7); axs[1,0].text(-0.05,y_low+0.5*len(ith),str(i)); y_low=y_up+10
+axs[1,0].axvline(sil, color="red", ls="--"); axs[1,0].set_title("Silhouette (UMAP 2-D)"); axs[1,0].set_xticklabels([]); axs[1,0].set_yticks([])
+classes=[c for c in cr if c.isdigit()]; prec=[cr[c]["precision"] for c in classes]; rec=[cr[c]["recall"] for c in classes]; f1s=[cr[c]["f1-score"] for c in classes]; x=np.arange(len(classes)); w=0.25
+axs[1,1].bar(x-w, prec, w, label="Precision"); axs[1,1].bar(x, rec, w, label="Recall"); axs[1,1].bar(x+w, f1s, w, label="F1"); axs[1,1].set_xticks(x); axs[1,1].set_xticklabels(classes); axs[1,1].set_ylim(0,1); axs[1,1].legend(); axs[1,1].set_title("Per-class metrics")
+plt.tight_layout(); st.pyplot(fig_val); fig_val.savefig(os.path.join(OUTPUT_DIRS["validation_plots"], "validation_metrics.png"), dpi=600)
+save_dataframe_csv(emb2d, "umap_embedding_2d.csv"); save_dataframe_csv(emb3d, "umap_embedding_3d.csv"); save_dataframe_csv(pd.DataFrame(cm), "confusion_matrix.csv")
+cr_df = pd.json_normalize(cr, sep="_").T.rename_axis("class").reset_index(); save_dataframe_csv(cr_df, "classification_report.csv")
 st.success("✅ Analysis complete! Outputs saved in /plots and /csv.")
-
 with st.expander("⬇️ Download key files"):
     download_button("UMAP 2-D CSV", emb2d.to_csv(index=False).encode(), "umap_embedding_2d.csv")
     download_button("UMAP 3-D CSV", emb3d.to_csv(index=False).encode(), "umap_embedding_3d.csv")
     download_button("Confusion matrix CSV", pd.DataFrame(cm).to_csv(index=False).encode(), "confusion_matrix.csv")
     download_button("Classification report CSV", cr_df.to_csv(index=False).encode(), "classification_report.csv")
-
-st.caption("© 2025 Galen O’Shea-Stone • Streamlit ≥ 1.33 | Python ≥ 3.9")
+st.caption("© 2025 Galen O’Shea-Stone — script refactor by ChatGPT • Streamlit ≥ 1.33 | Python ≥ 3.9")
