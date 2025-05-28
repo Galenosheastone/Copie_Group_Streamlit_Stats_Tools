@@ -1,102 +1,97 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Mar  3 14:48:41 2025
-
-@author: galen2
+Copié Lab • NMR Metabolomics Streamlit Toolbox
+Home / Introduction page
+Last edit: 2025-05-28  – complete rewrite for v3.0 release
+Author: Galen O’Shea-Stone 
 """
+
+import pathlib
 import streamlit as st
 
-# Set the configuration for the page
+# ── Global page settings ─────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Copié Group Streamlit Stats Tools",
+    page_title="Copié Lab • NMR Metabolomics Stats Toolbox",
+    page_icon="🧪",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# Main Title
-st.title("✨ Copié Group Metabolomics Toolbox ✨")
+# ── Header ───────────────────────────────────────────────────────────────────
+st.title("🧪 Copié Lab NMR Metabolomics Toolbox")
+st.subheader(
+    "Interactive preprocessing, statistics & visualisation — no coding required"
+)
 
-# Introduction / Welcome Section
 st.markdown(
     """
-    Welcome to the **Copié Group Metabolomics Toolbox**, a collection of Streamlit-based applications 
-    designed to help you process, explore, and analyze NMR metabolomics data quickly and efficiently. 
-    The Copié Lab is located at Montana State University in the Department of Chemistry and Biochemistry in Bozeman Montana
-    
-    This platform provides a unified interface for:
-    - Data preprocessing (e.g., normalization, scaling, log transformation)
-    - Outlier detection (not included in this release) 
-    - Pairwise analysis (t-test & MannWhitU) 
-    - Principal Component Analysis (PCA)
-    - Partial Least Squares Discriminant Analysis (PLS-DA)
+Welcome! This multipage app bundles the Copié Lab’s in-house **NMR metabolomics
+analysis pipeline** into a set of self-contained, point-and-click tools.  
+Whether you need quick QC plots for lab meeting or a full battery of
+multivariate stats for a manuscript, you’ll find a page for the job in the
+sidebar.
 
+### 🚀 Quick-start (3 steps)
+1. **Upload** a tidy-*wide* CSV  
+   • col 1 = *Sample ID*   • col 2 = *Group / Class*   • cols 3-n = metabolites  
+2. **Choose a page** from the sidebar (Processing → ANOVA, PCA, PLS-DA, UMAP …)  
+3. **Interact & download** ready-to-publish figures / tables
 
-    Whether you're looking to clean and transform raw NMR data or to delve into multivariate statistical 
-    analyses, each tool is accessible from the sidebar to the left.
-    """
+*(Need an example file? Head to the soon-to-come **“Download Example Data”** page.)*
+"""
 )
 
-# Overview of Tools
+# ── What’s new ───────────────────────────────────────────────────────────────
+with st.expander("✨ New in this release (May 2025)"):
+    st.markdown(
+        """
+* **Processing v2.6** – adds plain-text summaries of the “best” normalisation /
+  transformation pipeline and dynamic filenames for exports  
+* **Pairwise Stats v3.9** – 🆕 user-defined **group order** ▸ global BH-FDR ▸
+  Student vs Welch vs Mann-Whitney options  
+* **PCA v2.3** – interactive 3-D Plotly biplots, adjustable loading vector
+  labels, 95 % confidence ellipses  
+* **PLS-DA v2.1** – confusion matrices, ROC curves and permutation testing built-in  
+* **ANOVA v2.2** – streamlined clustered heatmap + boxplots for top-*N* hits  
+* **UMAP v1.2** – optional SHAP feature attribution for each pair of groups  
+* **RF-gPLSDA v1.1** – hybrid random-forest + sparse PLS-DA workflow  
+"""
+    )
+
+# ── Tool overview (collapsible) ──────────────────────────────────────────────
+with st.expander("🧰 Toolbox overview"):
+    st.markdown(
+        """
+| Page | Core capabilities |
+|------|-------------------|
+| **1 Processing** | Normalisation ∘ log-transform ∘ autoscale ∘ before/after QC plots |
+| **2 Pair-wise Tests** | Welch/Student/Mann-Whitney, global FDR, volcano plot, group-order control |
+| **3 PCA** | 2-D/3-D scores, loadings, biplots with adjustable vectors, ellipse/ellipsoid CI |
+| **4 PLS-DA** | Classification, VIP scores, permutation test, ROC / confusion matrix |
+| **5 ANOVA** | One-way ANOVA + BH-FDR across all metabolites, heatmap + per-metabolite boxplots |
+| **6 RF-gPLSDA** | Ensemble feature selection & sparse-PLS discrimination |
+| **7 UMAP** | Non-linear DR, interactive 2- & 3-D plots, SHAP interpretability |
+"""
+    )
+
+# ── Changelog (optional long history) ────────────────────────────────────────
+CHANGELOG = pathlib.Path("CHANGELOG.md")
+if CHANGELOG.is_file():
+    with st.expander("📜 Full changelog"):
+        st.markdown(CHANGELOG.read_text())
+
+# ── Footer ───────────────────────────────────────────────────────────────────
+st.markdown("---")
 st.markdown(
     """
-    ---
-    ### Available Tools
-    
-    1. **NMR Processing**  
-       Normalize and transform NMR metabolomics datasets (e.g., log transformation, scaling, row-based normalization).
-       This helps ensure your data is ready for subsequent statistical analysis.
-       
-    2. **Pairwise analysis**  
-        Choose between t-test (parametric) and Mann-Whitney U (non-parametric) pairwise tests. Quickly make publication
-        quality figures of all significant metaboloites, with the ability to choose rows & columns, or export single
-        metabolite figures. 
-       
-    3. **PCA Analysis**  
-       Easily create 2D and 3D PCA plots, investigate variable loadings, and visualize group clustering. 
-       This tool also offers confidence ellipses, biplots, and interactive 3D visualizations.
+Built with ❤️ by the **Copié Lab** (Montana State University, Bozeman, MT).  
+If you use this toolbox, please cite our most recent protocol paper  
+*(in prep — details forthcoming)*.
 
-    4. **PLSDA Analysis**  
-       Perform Partial Least Squares Discriminant Analysis to classify and evaluate predictive power. 
-       Includes cross-validation, confusion matrices, and ROC curves (for binary classification).
-
-        X. **Outlier Detection**  
-       Quickly identify potential outliers via PCA-based methods (Hotelling T² and Mahalanobis distance), 
-       then download a summary or visual plot to verify and act on them 
-       **NOTE THIS IS NOT INCLUDED IN THIS VERSION DUE TO PROCESSING REQS** 
-       Please contact the lab for access to this tool. 
-
-    ---
-    """
+Questions, bugs, or feature requests? Open an issue on the lab GitHub or email  
+**Galen O’Shea-Stone** · galenosheastone (at) montana (dot) edu
+"""
 )
 
-# Getting Started / Tips
-st.markdown(
-    """
-    ### Getting Started
-    1. **Upload Your Data**: Most tools expect a CSV file with samples, groups, and relevant features. 
-       Specific formatting requirements are listed on each tool's page.
-    2. **Configure Parameters**: Select your preprocessing or model options (e.g., log transformations, 
-       number of components, test splits, etc.).
-    3. **Review Outputs**: Plots, tables, and metrics are generated on-the-fly. 
-       Confusion matrices, ROC curves, PCA 2D/3D plots, and more can be explored.
-    4. **Download Results**: CSV outputs of processed data, outlier details, PCA/PLS-DA results, and 
-       other summaries are available for further offline analysis.
-
-    ### About Us
-    This toolbox is developed and maintained by the Copié Lab at Montana State University, 
-    where we focus on NMR metabolomics research. 
-
-    This app was created and is maintained by Galen O'Shea-Stone 
-    For questions or suggestions, please contact:  
-    galenoshea@gmail.com
-
-    ---
-    """
-)
-
-# Closing note
-st.info(
-    "Select a tool from the **sidebar** to begin your analysis. "
-    "You can return to this Home page any time by clicking 'Home' or the main title."
-)
+st.info("Ready to dive in? Select a page from the sidebar ➡️")
