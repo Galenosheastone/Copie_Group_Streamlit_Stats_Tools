@@ -297,4 +297,4 @@ with st.expander("⬇️ Download key files"):
     download_button("Confusion matrix CSV", pd.DataFrame(cm.tolist()).to_csv(index=False).encode(), "confusion_matrix.csv")
     download_button("Classification report CSV", cr_df.to_csv(index=False).encode(), "classification_report.csv")
 
-st.caption("© 2025 Galen O’Shea-Stone — script refactor by ChatGPT • Streamlit ≥ 1.33 | Python ≥ 3.9")
+st.caption("© 2025 Galen O’Shea-Stone • Streamlit ≥ 1.33 | Python ≥ 3.9")
