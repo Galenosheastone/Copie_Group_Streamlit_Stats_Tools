@@ -138,46 +138,58 @@ df_top = (pd.DataFrame({"Feature":X.columns,"AbsCorrSum":np.abs(corr).sum(1)})
             .nlargest(15,"AbsCorrSum"))
 with st.expander("📈 Top features correlated with UMAP axes"): st.write(df_top)
 
-# ─────────────────── 7 · XGBoost + SHAP (auto-align) ───────────────────
+# ─────────────────── 7 · XGBoost + SHAP (auto-align, safe) ───────────────────
 model = train_xgb(Xs, y_enc)
 
 if do_shap:
-    exp, sv = shap_vals(model, pd.DataFrame(X, columns=X.columns))
+    explainer, shap_vals = shap_vals(model, pd.DataFrame(X, columns=X.columns))
 
-    # ----- stack all classes safely -----
-    if isinstance(sv,list):  shap_stack = np.vstack([np.abs(a) for a in sv])
-    else:                    shap_stack = np.abs(sv)
+    # ---- stack all classes safely ----
+    if isinstance(shap_vals, list):      # multi-class
+        shap_stack = np.vstack([np.abs(sv) for sv in shap_vals])
+        shap_bees  = shap_vals           # keep list for beeswarm
+    else:                                # binary
+        shap_stack = np.abs(shap_vals)
+        shap_bees  = shap_vals
 
-    # ----- use the *actual* SHAP column count -----
-    n_shap_feat   = shap_stack.shape[1]
-    feat_names    = X.columns[:n_shap_feat]
-    mean_shap_val = shap_stack.mean(0)
+    # ---- ensure we never exceed the real column count ----
+    n_shap_feat = min(shap_stack.shape[1], X.shape[1])
+    feat_names  = X.columns[:n_shap_feat]
 
-    df_shap = (pd.DataFrame({"Feature":feat_names,
-                             "Mean|SHAP|":mean_shap_val})
-                 .sort_values("Mean|SHAP|",ascending=False))
-    top20 = df_shap.head(20)
+    mean_shap = shap_stack[:, :n_shap_feat].mean(0)
+    df_shap = (pd.DataFrame({"Feature": feat_names,
+                             "Mean|SHAP|": mean_shap})
+                 .sort_values("Mean|SHAP|", ascending=False))
+    df_top = df_shap.head(20)
 
     st.subheader("🔎 SHAP Feature Importance (top 20)")
-    fb, axb = plt.subplots(figsize=(6,5))
-    axb.barh(top20["Feature"], top20["Mean|SHAP|"])
-    axb.invert_yaxis(); axb.set_xlabel("Mean(|SHAP|)")
-    st.pyplot(fb); fb.savefig(os.path.join(DIRS["shap_plots"],"shap_bar.png"), dpi=600)
+    fbar, axbar = plt.subplots(figsize=(6,5))
+    axbar.barh(df_top["Feature"], df_top["Mean|SHAP|"])
+    axbar.invert_yaxis(); axbar.set_xlabel("Mean(|SHAP|)")
+    st.pyplot(fbar)
+    fbar.savefig(os.path.join(DIRS["shap_plots"], "shap_bar.png"), dpi=600)
+
+    # ---- DataFrame for beeswarm (columns always match) ----
+    X_display = X.iloc[:, :n_shap_feat].copy()
+    X_display.columns = feat_names
 
     with st.expander("Full SHAP beeswarm"):
         try:
-            shap.summary_plot(sv, pd.DataFrame(X.iloc[:, :n_shap_feat], columns=feat_names),
+            shap.summary_plot(shap_bees, X_display,
                               feature_names=feat_names, show=False)
             st.pyplot(bbox_inches="tight")
-            plt.savefig(os.path.join(DIRS["shap_plots"],"shap_beeswarm.png"), dpi=600)
+            plt.savefig(os.path.join(DIRS["shap_plots"],
+                                     "shap_beeswarm.png"), dpi=600)
         except Exception as e:
             st.warning(f"Beeswarm failed → violin fallback: {e}")
-            df_v = pd.DataFrame(shap_stack, columns=feat_names)
-            fv, axv = plt.subplots(figsize=(6,5))
-            sns.violinplot(data=df_v, inner="quartile", ax=axv)
-            axv.set_xticklabels(feat_names, rotation=90)
-            st.pyplot(fv); fv.savefig(os.path.join(DIRS["shap_plots"],"shap_violin.png"), dpi=600)
-
+            df_v = pd.DataFrame(shap_stack[:, :n_shap_feat], columns=feat_names)
+            fvio, axvio = plt.subplots(figsize=(6,5))
+            sns.violinplot(data=df_v, inner="quartile", ax=axvio)
+            axvio.set_xticklabels(feat_names, rotation=90)
+            st.pyplot(fvio)
+            fvio.savefig(os.path.join(DIRS["shap_plots"],
+                                      "shap_violin.png"), dpi=600)
+            
 # ───────────────────── 8 · Validation metrics ─────────────────────
 trust2d = trustworthiness(Xs, u2, n_neighbors=5)
 trust3d = trustworthiness(Xs, u3, n_neighbors=5)
