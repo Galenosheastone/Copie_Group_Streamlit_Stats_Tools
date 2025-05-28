@@ -1,26 +1,30 @@
-# Copié Group Metabolomics Stats Tools 2025
+# Copié Lab • Streamlit Metabolomics Stats Toolbox (2025)
 
 ## Overview
-
-Copie Group Metabolomics Stats Tools 2025 is a suite of tools designed for the statistical analysis of metabolomics data. The project provides efficient and reproducible methods for data processing, normalization, statistical modeling, and visualization to support metabolomics research.
+The **Copié Lab Streamlit Metabolomics Stats Toolbox** is an open-source,
+point-and-click collection of web apps for **¹H-NMR metabolomics** quality
+control, preprocessing, statistical modelling and visualisation.  
+Built with *Python 3.12 + Streamlit*, it bundles our entire in-house workflow—
+from technical‐replicate QC to multivariate machine-learning—in a browser tab
+that runs locally or in the cloud.
 
 ## Table of Contents
-
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
+- [Features](#features)   - [Installation](#installation)   - [Quick Start](#quick-start)  
+- [Usage (CLI & GUI)](#usage)   - [Contributing](#contributing)   - [License](#license)   - [Contact](#contact)
 
 ## Features
-
-- **Data Processing**: Supports filtering, normalization, and transformation of metabolomics datasets.
-- **Principal Component Analysis (PCA)**: Identifies patterns and visualizes high-dimensional data.
-- **Partial Least Squares Discriminant Analysis (PLS-DA)**: Classification analysis for metabolomics datasets.
-- **Functional Mixed Effects Modeling**: Statistical modeling for time-series metabolomics data.
-- **User-Friendly Command-Line Interface**: Allows users to process and analyze data with simple commands.
-- **Reproducibility**: Ensures standardized methods for metabolomics data analysis.
+| Module | Highlights |
+| ------ | ---------- |
+| **Outlier / QC** | Leverage-residual & Mahalanobis-distance plots to flag technical outliers |
+| **Processing v2.6** | 80 % filter · 1/5 × min imputation · normalise · log/√ transform · autoscale · before/after QC plots |
+| **Pair-Wise Stats v3.9** | Student / Welch / Mann-Whitney tests, global BH-FDR, volcano plot, **custom group-order widget** |
+| **ANOVA v2.2** | One-way ANOVA + BH-FDR across all metabolites, clustered heatmap & per-metabolite boxplots |
+| **PCA v2.3** | 2-D/3-D scores, adjustable loading vectors, 95 % ellipses/ellipsoids, interactive Plotly biplots |
+| **UMAP v1.2** | Non-linear 2-D/3-D embedding with optional SHAP feature attribution |
+| **PLS-DA v2.1** | VIP scores, permutation testing, confusion matrix & ROC curves |
+| **RF-gPLSDA v1.1** | Random-Forest driven feature pre-selection → sparse PLS-DA discrimination |
+| **Streamlit UI** | Intuitive widgets, dark-mode aware plots, one-click download of figures & tables |
+| **Reproducibility** | Deterministic random seeds & embedded parameter metadata |
 
 ## Installation
 
