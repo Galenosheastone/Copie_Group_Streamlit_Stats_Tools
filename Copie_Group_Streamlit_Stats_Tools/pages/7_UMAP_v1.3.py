@@ -164,7 +164,7 @@ df_top = (pd.DataFrame({'Feature': X.columns,
 with st.expander("📈 Top features correlated with UMAP axes"):
     st.write(df_top)
 
-# ─────────────────── 9 · XGBoost **& SHAP (fixed)** ────────────────────
+# ─────────────────── 9 · XGBoost & SHAP (multi-class safe) ───────────────────
 model = train_xgb(Xs, y_enc, n_trees, random_state)
 
 if do_shap:
@@ -173,26 +173,35 @@ if do_shap:
     )
 
     # ------------------------------------------------------------------
-    # Prepare arrays separately for (i) bar chart and (ii) beeswarm plot
+    # ❶  STACK the per-class matrices, *then* flatten so every row
+    #    is a sample, even if classes are imbalanced.
     # ------------------------------------------------------------------
-    if isinstance(shap_vals, list):                        # multi-class
-        shap_for_bar      = np.mean(np.abs(shap_vals), axis=0)   # (n samples, n feat)
-        shap_beeswarm_vals = shap_vals                         # list of arrays
-    else:                                                  # binary / single-class
-        shap_for_bar       = shap_vals                       # (n samples, n feat)
+    if isinstance(shap_vals, list):                 # multi-class
+        # list of (n_i, n_feat) ⇒ vertical stack ⇒ (Σn_i, n_feat)
+        shap_for_bar = np.vstack([np.abs(sv) for sv in shap_vals])
+        shap_beeswarm_vals = shap_vals              # SHAP accepts the list
+    else:                                           # binary / single-output
+        shap_for_bar = np.abs(shap_vals)            # (n, n_feat)
         shap_beeswarm_vals = shap_vals
 
-    mean_shap = np.abs(shap_for_bar).mean(axis=0)
-    df_shap   = pd.DataFrame({"Feature": X.columns,
-                              "Mean|SHAP|": mean_shap})
-    df_shap_top = df_shap.nlargest(20, "Mean|SHAP|")
+    # ❷  Per-feature mean │SHAP│ values (1-D!)
+    mean_shap = shap_for_bar.mean(axis=0)
+
+    # ❸  Build DataFrame with plain Python lists to be extra safe
+    df_shap = pd.DataFrame({
+        "Feature": X.columns.tolist(),
+        "Mean|SHAP|": mean_shap.tolist()
+    }).sort_values("Mean|SHAP|", ascending=False)
+
+    df_shap_top = df_shap.head(20)
 
     st.subheader("🔎 SHAP Feature Importance (top 20)")
-    fig_bar, ax_bar = plt.subplots(figsize=(6,5))
+    fig_bar, ax_bar = plt.subplots(figsize=(6, 5))
     ax_bar.barh(df_shap_top["Feature"], df_shap_top["Mean|SHAP|"])
     ax_bar.invert_yaxis(); ax_bar.set_xlabel("Mean(|SHAP|)")
     st.pyplot(fig_bar)
-    fig_bar.savefig(os.path.join(OUTPUT_DIRS["shap_plots"], "shap_bar.png"), dpi=600)
+    fig_bar.savefig(os.path.join(OUTPUT_DIRS["shap_plots"], "shap_bar.png"),
+                    dpi=600)
 
     with st.expander("Full SHAP beeswarm"):
         try:
@@ -203,23 +212,19 @@ if do_shap:
                 show=False
             )
             st.pyplot(bbox_inches="tight")
-            plt.savefig(os.path.join(
-                OUTPUT_DIRS["shap_plots"], "shap_beeswarm.png"), dpi=600)
+            plt.savefig(os.path.join(OUTPUT_DIRS["shap_plots"],
+                        "shap_beeswarm.png"), dpi=600)
         except Exception as e:
             st.warning(f"SHAP beeswarm failed → fallback violin: {e}")
-            # Build long-form dataframe for violin fallback
-            shap_mat = (np.mean(np.abs(shap_vals), axis=0)
-                        if isinstance(shap_vals, list) else shap_vals)
-            df_violin = pd.DataFrame(
-                {feat: shap_mat[:, i] for i, feat in enumerate(X.columns)}
-            )
-            fig_v, ax_v = plt.subplots(figsize=(6,5))
-            sns.violinplot(data=df_violin, inner="quartile", ax=ax_v)
+            # n_total × n_feat matrix already in shap_for_bar
+            df_v = pd.DataFrame(shap_for_bar, columns=X.columns)
+            fig_v, ax_v = plt.subplots(figsize=(6, 5))
+            sns.violinplot(data=df_v, inner="quartile", ax=ax_v)
             ax_v.set_xticklabels(X.columns, rotation=90)
             st.pyplot(fig_v)
-            fig_v.savefig(os.path.join(
-                OUTPUT_DIRS["shap_plots"], "shap_violin.png"), dpi=600)
-
+            fig_v.savefig(os.path.join(OUTPUT_DIRS["shap_plots"],
+                        "shap_violin.png"), dpi=600)
+                   
 # ─────────────── 10 · Validation metrics (unchanged) ───────────────
 trust2d = trustworthiness(Xs, u2, n_neighbors=5)
 trust3d = trustworthiness(Xs, u3, n_neighbors=5)
