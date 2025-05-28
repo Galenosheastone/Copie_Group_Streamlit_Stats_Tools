@@ -138,25 +138,34 @@ df_top = (pd.DataFrame({"Feature":X.columns,"AbsCorrSum":np.abs(corr).sum(1)})
             .nlargest(15,"AbsCorrSum"))
 with st.expander("📈 Top features correlated with UMAP axes"): st.write(df_top)
 
-# ─────────────────── 7 · XGBoost + SHAP (auto-align, safe) ───────────────────
+# ─────────────────── 7 · XGBoost + SHAP (column-aligned) ───────────────────
 model = train_xgb(Xs, y_enc)
 
 if do_shap:
-    explainer, shap_vals = shap_vals(model, pd.DataFrame(X, columns=X.columns))
+    explainer, raw_sv = get_shap_vals(model,
+                                      pd.DataFrame(X, columns=X.columns))
 
-    # ---- stack all classes safely ----
-    if isinstance(shap_vals, list):      # multi-class
-        shap_stack = np.vstack([np.abs(sv) for sv in shap_vals])
-        shap_bees  = shap_vals           # keep list for beeswarm
-    else:                                # binary
-        shap_stack = np.abs(shap_vals)
-        shap_bees  = shap_vals
+    # ---- stack and trim the matrices so EVERY object has the same width ----
+    if isinstance(raw_sv, list):          # multi-class
+        # width is raw_sv[0].shape[1]  (same for all classes)
+        shap_stack = np.vstack([np.abs(a) for a in raw_sv])
+    else:                                 # binary / single-output
+        shap_stack = np.abs(raw_sv)
 
-    # ---- ensure we never exceed the real column count ----
+    # how many columns do we *actually* have after XGBoost pruning?
     n_shap_feat = min(shap_stack.shape[1], X.shape[1])
     feat_names  = X.columns[:n_shap_feat]
 
-    mean_shap = shap_stack[:, :n_shap_feat].mean(0)
+    # trim every matrix to the agreed width 〈n_shap_feat〉
+    if isinstance(raw_sv, list):
+        shap_bees = [sv[:, :n_shap_feat] for sv in raw_sv]
+    else:
+        shap_bees = raw_sv[:, :n_shap_feat]
+
+    shap_stack = shap_stack[:, :n_shap_feat]          # for bar/violin
+
+    # ---- bar chart ----
+    mean_shap = shap_stack.mean(0)
     df_shap = (pd.DataFrame({"Feature": feat_names,
                              "Mean|SHAP|": mean_shap})
                  .sort_values("Mean|SHAP|", ascending=False))
@@ -169,7 +178,7 @@ if do_shap:
     st.pyplot(fbar)
     fbar.savefig(os.path.join(DIRS["shap_plots"], "shap_bar.png"), dpi=600)
 
-    # ---- DataFrame for beeswarm (columns always match) ----
+    # ---- DataFrame for colour-coding in beeswarm ----
     X_display = X.iloc[:, :n_shap_feat].copy()
     X_display.columns = feat_names
 
