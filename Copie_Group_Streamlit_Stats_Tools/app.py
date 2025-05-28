@@ -85,12 +85,11 @@ if CHANGELOG.is_file():
 st.markdown("---")
 st.markdown(
     """
-Built with ❤️ by the **Copié Lab** (Montana State University, Bozeman, MT).  
-If you use this toolbox, please cite our most recent protocol paper  
-*(in prep — details forthcoming)*.
+Built and maintained by Galen O'Shea-Stone for the **Copié Lab** (Montana State University, Bozeman, MT).  
+
 
 Questions, bugs, or feature requests? Open an issue on the lab GitHub or email  
-**Galen O’Shea-Stone** · galenosheastone (at) montana (dot) edu
+**Galen O’Shea-Stone** · galenoshea@gmail.com
 """
 )
 
