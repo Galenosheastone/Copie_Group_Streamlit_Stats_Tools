@@ -3,14 +3,12 @@
 """
 Copié Lab • NMR Metabolomics Streamlit Toolbox
 Home / Introduction page
-Last edit: 2025-05-28  – complete rewrite for v3.0 release
-Author: Galen O’Shea-Stone 
+Last edit: 2025-05-28 – reorganised to match classic Copié-style landing page
+Author: Galen O’Shea-Stone  (with ChatGPT assistance)
 """
-
-import pathlib
 import streamlit as st
 
-# ── Global page settings ─────────────────────────────────────────────────────
+# ── Page configuration ───────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Copié Lab • NMR Metabolomics Stats Toolbox",
     page_icon="🧪",
@@ -18,79 +16,86 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Header ───────────────────────────────────────────────────────────────────
-st.title("🧪 Copié Lab NMR Metabolomics Toolbox")
-st.subheader(
-    "Interactive preprocessing, statistics & visualisation — no coding required"
-)
+# ── Main title ───────────────────────────────────────────────────────────────
+st.title("🧪 Copié Lab Metabolomics Toolbox")
 
+# ── Welcome / overview ───────────────────────────────────────────────────────
 st.markdown(
     """
-Welcome! This multipage app bundles the Copié Lab’s in-house **NMR metabolomics
-analysis pipeline** into a set of self-contained, point-and-click tools.  
-Whether you need quick QC plots for lab meeting or a full battery of
-multivariate stats for a manuscript, you’ll find a page for the job in the
-sidebar.
+Welcome to the **Copié Lab Metabolomics Toolbox** – a suite of Streamlit apps
+that turns our NMR pipeline into an interactive, point-and-click experience.
 
-### 🚀 Quick-start (3 steps)
-1. **Upload** a tidy-*wide* CSV  
-   • col 1 = *Sample ID*   • col 2 = *Group / Class*   • cols 3-n = metabolites  
-2. **Choose a page** from the sidebar (Processing → ANOVA, PCA, PLS-DA, UMAP …)  
-3. **Interact & download** ready-to-publish figures / tables
+With just a tidy-wide CSV you can:
 
-*(Need an example file? Head to the soon-to-come **“Download Example Data”** page.)*
+- 📊 **Pre-process** (normalise → transform → autoscale)  
+- 🔎 **Explore** multivariate structure (PCA, UMAP, PLS-DA, RF-gPLSDA)  
+- 📈 **Test hypotheses** (one-way ANOVA, pair-wise t/Welch/Mann-Whitney)  
+- 🖼️ **Download** ready-to-publish figures and tables  
 """
 )
 
-# ── What’s new ───────────────────────────────────────────────────────────────
-with st.expander("✨ New in this release (May 2025)"):
-    st.markdown(
-        """
-* **Processing v2.6** – adds plain-text summaries of the “best” normalisation /
-  transformation pipeline and dynamic filenames for exports  
-* **Pairwise Stats v3.9** – 🆕 user-defined **group order** ▸ global BH-FDR ▸
-  Student vs Welch vs Mann-Whitney options  
-* **PCA v2.3** – interactive 3-D Plotly biplots, adjustable loading vector
-  labels, 95 % confidence ellipses  
-* **PLS-DA v2.1** – confusion matrices, ROC curves and permutation testing built-in  
-* **ANOVA v2.2** – streamlined clustered heatmap + boxplots for top-*N* hits  
-* **UMAP v1.2** – optional SHAP feature attribution for each pair of groups  
-* **RF-gPLSDA v1.1** – hybrid random-forest + sparse PLS-DA workflow  
-"""
-    )
-
-# ── Tool overview (collapsible) ──────────────────────────────────────────────
-with st.expander("🧰 Toolbox overview"):
-    st.markdown(
-        """
-| Page | Core capabilities |
-|------|-------------------|
-| **1 Processing** | Normalisation ∘ log-transform ∘ autoscale ∘ before/after QC plots |
-| **2 Pair-wise Tests** | Welch/Student/Mann-Whitney, global FDR, volcano plot, group-order control |
-| **3 PCA** | 2-D/3-D scores, loadings, biplots with adjustable vectors, ellipse/ellipsoid CI |
-| **4 PLS-DA** | Classification, VIP scores, permutation test, ROC / confusion matrix |
-| **5 ANOVA** | One-way ANOVA + BH-FDR across all metabolites, heatmap + per-metabolite boxplots |
-| **6 RF-gPLSDA** | Ensemble feature selection & sparse-PLS discrimination |
-| **7 UMAP** | Non-linear DR, interactive 2- & 3-D plots, SHAP interpretability |
-"""
-    )
-
-# ── Changelog (optional long history) ────────────────────────────────────────
-CHANGELOG = pathlib.Path("CHANGELOG.md")
-if CHANGELOG.is_file():
-    with st.expander("📜 Full changelog"):
-        st.markdown(CHANGELOG.read_text())
-
-# ── Footer ───────────────────────────────────────────────────────────────────
-st.markdown("---")
+# ── Key applications ─────────────────────────────────────────────────────────
 st.markdown(
     """
-Built and maintained by Galen O'Shea-Stone for the **Copié Lab** (Montana State University, Bozeman, MT).  
+### Key Applications
+1. **Data Processing (v2.6)**  
+   Normalisation, log/√ transforms, autoscaling, before/after QC plots and a
+   plain-text summary of the “best” pipeline.
 
+2. **Pair-Wise Statistics (v3.9)**  
+   Student vs Welch vs Mann-Whitney, global BH-FDR, volcano plot, **custom
+   group order**.
 
-Questions, bugs, or feature requests? Open an issue on the lab GitHub or email  
-**Galen O’Shea-Stone** · galenoshea@gmail.com
+3. **PCA (v2.3)**  
+   2-D & 3-D scores, adjustable loading vectors, 95 % confidence ellipses /
+   ellipsoids, interactive Plotly biplots.
+
+4. **PLS-DA (v2.1)**  
+   VIP scores, permutation test, confusion matrix & ROC curves.
+
+5. **ANOVA (v2.2)**  
+   One-way ANOVA across all metabolites with BH-FDR, clustered heatmap +
+   per-metabolite boxplots.
+
+6. **RF-gPLSDA (v1.1)**  
+   Hybrid Random-Forest feature selection followed by sparse PLS-DA
+   discrimination.
+
+7. **UMAP (v1.2)**  
+   Non-linear 2-D/3-D embedding with optional SHAP feature attribution.
 """
 )
 
-st.info("Ready to dive in? Select a page from the sidebar ➡️")
+# ── Getting started ──────────────────────────────────────────────────────────
+st.markdown(
+    """
+### Getting Started
+1. **Upload your data**  
+   *Column 1*: Sample ID • *Column 2*: Group/Class • *Columns 3-n*: metabolites.
+
+2. **Choose a tool** from the sidebar and tweak the parameters to taste.
+
+3. **Explore the outputs** – plots, tables and metrics update instantly.
+
+4. **Download results** for offline analysis or direct use in figures.
+
+*(Need a sample file? A “Download Example Data” page is coming soon.)*
+"""
+)
+
+# ── About & contact ─────────────────────────────────────────────────────────
+st.markdown(
+    """
+### About Us
+This toolbox is developed and maintained by the **Copié Lab** (Montana State
+University, Bozeman MT) where we investigate metabolism with high-field NMR.
+
+Questions, bugs or feature requests?  
+**Galen O’Shea-Stone**  ·  galenosheastone@montana.edu
+"""
+)
+
+st.info(
+    "Select a tool from the **sidebar** to begin your analysis. "
+    "You can return here any time by clicking ‘Home’."
+)
