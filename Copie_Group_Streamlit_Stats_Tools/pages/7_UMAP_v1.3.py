@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-2_UMAP_Streamlit.py (robust-fix 2025-05-29, v1.3)
+2_UMAP_Streamlit.py (robust-fix 2025-05-29, v1.4)
 Streamlit wrapper for the “UMAP Metabolomics Analysis” pipeline.
-Prevents 'Per-column arrays must each be 1-dimensional' errors with strict SHAP handling.
+Prevents 'Per-column arrays must each be 1-dimensional' errors with strict SHAP handling,
+and adds robust CSV data loading/feedback for user errors.
 """
 
 import os
@@ -58,24 +59,34 @@ def save_dataframe_csv(df: pd.DataFrame, fname: str) -> None:
 def download_button(label: str, data: bytes, fname: str, mime="text/csv"):
     st.download_button(label, data, file_name=fname, mime=mime)
 
-# ───────────────────────────── 1. Load & cache data ───────────────────────────
+# ─────────────── 1. Load & cache data (with robust feedback) ────────────────
 @st.cache_data(show_spinner="Loading data …")
 def load_data(uploaded_file) -> pd.DataFrame:
-    if uploaded_file is None:
-        st.stop()
     return pd.read_csv(uploaded_file)
 
 uploaded = st.file_uploader("📄 Choose CSV file", type=["csv"])
-df = load_data(uploaded) if uploaded else None
-if df is None:
+
+if uploaded is not None:
+    try:
+        df = load_data(uploaded)
+        st.success(f"Loaded file with shape {df.shape} and columns: {list(df.columns)}")
+        if df.shape[1] < 3:
+            st.error("Your CSV must have at least 3 columns: sample ID, group, and features.")
+            st.stop()
+        first_col, second_col = df.columns[:2]
+        if df[first_col].isnull().any() or df[second_col].isnull().any():
+            st.error("First and second columns (sample ID and group) must not have missing values.")
+            st.stop()
+        X = df.drop([first_col, second_col], axis=1)
+        y = df[second_col]
+        y_enc = LabelEncoder().fit_transform(y)
+        groups = y.unique()
+    except Exception as e:
+        st.error(f"Failed to read CSV or parse columns: {e}")
+        st.stop()
+else:
     st.info("⬆️ Upload a file to begin.")
     st.stop()
-
-first_col, second_col = df.columns[:2]
-X = df.drop([first_col, second_col], axis=1)
-y = df[second_col]
-y_enc = LabelEncoder().fit_transform(y)
-groups = y.unique()
 
 # ───────────────────────────── 2. Sidebar parameters ─────────────────────────
 with st.sidebar:
@@ -340,7 +351,4 @@ st.success("✅ Analysis complete! Outputs saved in /plots and /csv.")
 with st.expander("⬇️ Download key files"):
     download_button("UMAP 2-D CSV", emb2d.to_csv(index=False).encode(), "umap_embedding_2d.csv")
     download_button("UMAP 3-D CSV", emb3d.to_csv(index=False).encode(), "umap_embedding_3d.csv")
-    download_button("Confusion matrix CSV", pd.DataFrame(cm).to_csv(index=False).encode(), "confusion_matrix.csv")
-    download_button("Classification report CSV", cr_df.to_csv(index=False).encode(), "classification_report.csv")
-
-st.caption("© 2025 Galen O’Shea-Stone • Streamlit ≥ 1.33 | Python ≥ 3.9")
+    download_button("Confusion matrix CSV
