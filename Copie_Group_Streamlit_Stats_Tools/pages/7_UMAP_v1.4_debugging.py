@@ -216,25 +216,31 @@ model = train_xgb(X_scaled, y_enc, n_estimators, random_state)
 
 if do_shap:
     explainer, shap_vals = get_shap_values(model, X)
-    # --- Bulletproof multi-class handling, always output (n_samples, n_features) ---
-    if isinstance(shap_vals, list):
-        arr = np.array(shap_vals)
-        st.write("DEBUG: SHAP arr shape (should be 3D for multiclass)", arr.shape)
-        if arr.ndim == 3:  # (n_classes, n_samples, n_features)
-            shap_beeswarm = np.mean(np.abs(arr), axis=0)
-        elif arr.ndim == 2:  # (n_samples, n_features)
-            shap_beeswarm = np.abs(arr)
-        else:
-            st.error(f"Unexpected SHAP shape: {arr.shape}")
-            st.stop()
-    else:
-        shap_beeswarm = shap_vals
+    arr = np.array(shap_vals)
 
-    st.write("DEBUG: shap_beeswarm shape", np.shape(shap_beeswarm))
-    if len(np.shape(shap_beeswarm)) != 2:
-        st.error(f"shap_beeswarm shape not 2D: {np.shape(shap_beeswarm)}")
+    # Debug print
+    st.write("DEBUG: Raw SHAP arr shape", arr.shape)
+
+    # If arr is more than 2D, reduce to (n_samples, n_features)
+    if arr.ndim == 3:
+        # (n_classes, n_samples, n_features) → mean(abs()) over axis 0 (classes)
+        shap_beeswarm = np.mean(np.abs(arr), axis=0)
+    elif arr.ndim == 2:
+        shap_beeswarm = arr
+    elif arr.ndim > 3:
+        # flatten all leading axes into one, then take mean over that, leaving (n_samples, n_features)
+        n_features = arr.shape[-1]
+        arr_flat = arr.reshape(-1, arr.shape[-2], n_features)
+        shap_beeswarm = np.mean(np.abs(arr_flat), axis=0)
+    else:
+        st.error(f"Unexpected SHAP value shape: {arr.shape}")
         st.stop()
 
+    st.write("DEBUG: Reduced shap_beeswarm shape", shap_beeswarm.shape)
+    if len(shap_beeswarm.shape) != 2:
+        st.error(f"shap_beeswarm shape not 2D after reduction: {np.shape(shap_beeswarm)}")
+        st.stop()
+        
     mean_abs = np.abs(shap_beeswarm).mean(axis=0)
     imp_df = pd.DataFrame({"Feature": X.columns, "Mean|SHAP|": mean_abs})
     imp_top = imp_df.sort_values("Mean|SHAP|", ascending=False).head(20)
