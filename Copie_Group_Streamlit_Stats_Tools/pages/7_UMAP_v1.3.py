@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-2_UMAP_Streamlit.py (robust-fix 2025-05-29, v1.4)
+2_UMAP_Streamlit.py (robust-fix 2025-05-29, v1.5)
 Streamlit wrapper for the “UMAP Metabolomics Analysis” pipeline.
 Prevents 'Per-column arrays must each be 1-dimensional' errors with strict SHAP handling,
 and adds robust CSV data loading/feedback for user errors.
@@ -349,6 +349,16 @@ save_dataframe_csv(cr_df, "classification_report.csv")
 st.success("✅ Analysis complete! Outputs saved in /plots and /csv.")
 
 with st.expander("⬇️ Download key files"):
-    download_button("UMAP 2-D CSV", emb2d.to_csv(index=False).encode(), "umap_embedding_2d.csv")
-    download_button("UMAP 3-D CSV", emb3d.to_csv(index=False).encode(), "umap_embedding_3d.csv")
-    download_button("Confusion matrix CSV
+    download_button(
+        "UMAP 2-D CSV",
+        emb2d.to_csv(index=False).encode(),
+        "umap_embedding_2d.csv"
+    )
+    download_button(
+        "UMAP 3-D CSV",
+        emb3d.to_csv(index=False).encode(),
+        "umap_embedding_3d.csv"
+    )
+    download_button(
+        "Confusion matrix CSV",
+        pd.DataFrame(cm).to_csv(index=False
