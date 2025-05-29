@@ -217,8 +217,6 @@ model = train_xgb(X_scaled, y_enc, n_estimators, random_state)
 if do_shap:
     explainer, shap_vals = get_shap_values(model, X)
     arr = np.array(shap_vals)
-
-    # Debug print
     st.write("DEBUG: Raw SHAP arr shape", arr.shape)
 
     # If arr is more than 2D, reduce to (n_samples, n_features)
@@ -237,21 +235,20 @@ if do_shap:
         st.stop()
 
     st.write("DEBUG: Reduced shap_beeswarm shape", shap_beeswarm.shape)
-    if len(shap_beeswarm.shape) != 2:
-        st.error(f"shap_beeswarm shape not 2D after reduction: {np.shape(shap_beeswarm)}")
+    # Ensure we have (n_samples, n_features)
+    if shap_beeswarm.shape == (X.shape[0], X.shape[1]):
+        pass  # good!
+    elif shap_beeswarm.shape == (X.shape[1], X.shape[0]):
+        st.warning("Transposing shap_beeswarm to match (samples, features).")
+        shap_beeswarm = shap_beeswarm.T
+    else:
+        st.error(
+            f"shap_beeswarm shape {shap_beeswarm.shape} does not match samples/features: "
+            f"expected {(X.shape[0], X.shape[1])} or {(X.shape[1], X.shape[0])}"
+        )
         st.stop()
-        
-    mean_abs = np.abs(shap_beeswarm).mean(axis=0)
-    imp_df = pd.DataFrame({"Feature": X.columns, "Mean|SHAP|": mean_abs})
-    imp_top = imp_df.sort_values("Mean|SHAP|", ascending=False).head(20)
 
-    st.subheader("🔎 SHAP Feature Importance (top 20)")
-    st.write("DEBUG: imp_top DataFrame head", imp_top.head())
-    fig_bar, ax_bar = plt.subplots(figsize=(6, 5))
-    imp_top.plot.barh(x="Feature", y="Mean|SHAP|", ax=ax_bar, legend=False)
-    ax_bar.invert_yaxis(); ax_bar.set_xlabel("Mean(|SHAP|)")
-    st.pyplot(fig_bar)
-    fig_bar.savefig(os.path.join(OUTPUT_DIRS["shap_plots"], "shap_bar.png"), dpi=600)
+    st.write("DEBUG: FINAL shap_beeswarm shape for DataFrame:", shap_beeswarm.shape)
 
     # Beeswarm (with robust fallback)
     with st.expander("Full SHAP beeswarm"):
