@@ -226,20 +226,33 @@ model = train_xgb(X_scaled, y_enc, n_estimators, random_state)
 if do_shap:
     explainer, shap_vals = get_shap_values(model, X)
     st.write("DEBUG: raw shap_vals type", type(shap_vals))
-    
+
     # --- Robust multi-class/binary SHAP reduction ---
     if isinstance(shap_vals, list):
         st.write("DEBUG: SHAP returned a list, len=", len(shap_vals))
-        # Each entry: (n_samples, n_features), list length = n_classes
-        arr = np.stack(shap_vals)  # shape (n_classes, n_samples, n_features)
+        arr = np.stack(shap_vals)  # (n_classes, n_samples, n_features)
     else:
         arr = np.array(shap_vals)
     st.write("DEBUG: Raw SHAP arr shape", arr.shape)
 
+    # Handle various 3D SHAP shapes
     if arr.ndim == 3:
-        # (n_classes, n_samples, n_features)
-        shap_beeswarm = np.mean(np.abs(arr), axis=0)  # → (n_samples, n_features)
-        st.write(f"DEBUG: Reduced 3D SHAP to (n_samples, n_features): {shap_beeswarm.shape}")
+        if arr.shape[0] == X.shape[0] and arr.shape[1] == X.shape[1]:
+            # (n_samples, n_features, n_classes) (your case)
+            st.write("DEBUG: Detected (samples, features, classes) SHAP shape")
+            shap_beeswarm = np.mean(np.abs(arr), axis=2)
+        elif arr.shape[0] == len(np.unique(y_enc)):
+            # (n_classes, n_samples, n_features)
+            st.write("DEBUG: Detected (classes, samples, features) SHAP shape")
+            shap_beeswarm = np.mean(np.abs(arr), axis=0)
+        elif arr.shape[1] == X.shape[0] and arr.shape[2] == X.shape[1]:
+            # (n_classes, n_samples, n_features)
+            st.write("DEBUG: Detected (classes, samples, features) SHAP shape (alternate)")
+            shap_beeswarm = np.mean(np.abs(arr), axis=0)
+        else:
+            st.error(f"Unknown SHAP array shape for 3D: {arr.shape}")
+            st.stop()
+        st.write(f"DEBUG: Reduced 3D SHAP to (samples, features): {shap_beeswarm.shape}")
     elif arr.ndim == 2:
         shap_beeswarm = arr
         st.write(f"DEBUG: 2D SHAP array shape: {shap_beeswarm.shape}")
@@ -250,6 +263,7 @@ if do_shap:
         st.error(f"SHAP beeswarm shape {shap_beeswarm.shape} does not match X shape {X.shape}")
         st.stop()
     # --- END robust SHAP reduction ---
+
 
     st.write("DEBUG: FINAL shap_beeswarm shape for DataFrame:", shap_beeswarm.shape)
 
