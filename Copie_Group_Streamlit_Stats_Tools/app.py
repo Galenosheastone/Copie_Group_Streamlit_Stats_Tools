@@ -3,8 +3,8 @@
 """
 Copié Lab • NMR Metabolomics Streamlit Toolbox
 Home / Introduction page
-Last edit: 2025-05-28 – reorganised to match classic Copié-style landing page
-Author: Galen O’Shea-Stone  (with ChatGPT assistance)
+Last edit: 2025-05-28 – 
+Author: Galen O’Shea-Stone 
 """
 import streamlit as st
 
@@ -87,11 +87,11 @@ st.markdown(
 st.markdown(
     """
 ### About Us
-This toolbox is developed and maintained by the **Copié Lab** (Montana State
+This toolbox was developed and is maintained by the **Copié Lab** (Montana State
 University, Bozeman MT) where we investigate metabolism with high-field NMR.
 
 Questions, bugs or feature requests?  
-**Galen O’Shea-Stone**  ·  galenosheastone@montana.edu
+**Galen O’Shea-Stone**  ·  galenosheastone@gmail.com
 """
 )
 
