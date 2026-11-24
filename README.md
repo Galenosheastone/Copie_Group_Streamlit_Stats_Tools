@@ -18,7 +18,7 @@ that runs locally or in the cloud.
 | **Outlier / QC** | Leverage-residual & Mahalanobis-distance plots to flag technical outliers |
 | **Processing v2.6** | 80 % filter · 1/5 × min imputation · normalise · log/√ transform · autoscale · before/after QC plots |
 | **Pair-Wise Stats v3.9** | Student / Welch / Mann-Whitney tests, global BH-FDR, volcano plot, **custom group-order widget** |
-| **ANOVA v2.2** | One-way ANOVA + BH-FDR across all metabolites, clustered heatmap & per-metabolite boxplots |
+| **ANOVA v2.3** | One-way ANOVA + BH-FDR, heatmap & boxplots; per-metabolite residuals versus fitted, normal Q–Q, and residuals by group with PNG download |
 | **PCA v2.3** | 2-D/3-D scores, adjustable loading vectors, 95 % ellipses/ellipsoids, interactive Plotly biplots |
 | **UMAP v1.2** | Non-linear 2-D/3-D embedding with optional SHAP feature attribution |
 | **PLS-DA v2.1** | VIP scores, permutation testing, confusion matrix & ROC curves |

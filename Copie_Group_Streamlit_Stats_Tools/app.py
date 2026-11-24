@@ -53,9 +53,9 @@ st.markdown(
 4. **PLS-DA (v2.1)**  
    VIP scores, permutation test, confusion matrix & ROC curves.
 
-5. **ANOVA (v2.2)**  
+5. **ANOVA (v2.3)**
    One-way ANOVA across all metabolites with BH-FDR, clustered heatmap +
-   per-metabolite boxplots.
+   per-metabolite boxplots, and residual diagnostics with PNG downloads.
 
 6. **RF-gPLSDA (v1.1)**  
    Hybrid Random-Forest feature selection followed by sparse PLS-DA
